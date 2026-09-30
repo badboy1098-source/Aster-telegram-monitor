@@ -137,9 +137,7 @@ def check_order(symbol, side, price, qty):
 
 
 def on_message(ws, message):
-
     try:
-
         data = json.loads(message)
 
         if "data" in data:
@@ -150,24 +148,53 @@ def on_message(ws, message):
 
         symbol = data.get("s", "UNKNOWN")
 
-        bids = data.get("b", [])
-        asks = data.get("a", [])
+        for price, qty in data.get("b", []):
+            price = float(price)
+            qty = float(qty)
 
-        for price, qty in bids:
-            check_order(
-                symbol,
-                "BUY",
-                price,
-                qty
-            )
+            value = price * qty
+            key = f"{symbol}:BUY:{price}"
 
-        for price, qty in asks:
-            check_order(
-                symbol,
-                "SELL",
-                price,
-                qty
-            )
+            if value >= ORDER_THRESHOLD:
+                if key not in last_alerts:
+                    last_alerts[key] = True
+
+                    message = (
+                        "⚡ КРУПНЫЙ BUY\n\n"
+                        f"💲 {symbol}\n"
+                        f"🟢 BUY ≥ $15k: ${value:,.0f}\n"
+                        f"💵 Цена уровня: {price}"
+                    )
+
+                    print(message)
+                    send_telegram(message)
+
+            else:
+                last_alerts.pop(key, None)
+
+        for price, qty in data.get("a", []):
+            price = float(price)
+            qty = float(qty)
+
+            value = price * qty
+            key = f"{symbol}:SELL:{price}"
+
+            if value >= ORDER_THRESHOLD:
+                if key not in last_alerts:
+                    last_alerts[key] = True
+
+                    message = (
+                        "⚡ КРУПНЫЙ SELL\n\n"
+                        f"💲 {symbol}\n"
+                        f"🔴 SELL ≥ $15k: ${value:,.0f}\n"
+                        f"💵 Цена уровня: {price}"
+                    )
+
+                    print(message)
+                    send_telegram(message)
+
+            else:
+                last_alerts.pop(key, None)
 
     except Exception as e:
         print("Ошибка обработки WebSocket:", e)
