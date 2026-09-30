@@ -96,40 +96,39 @@ def check_order(symbol, side, price, qty):
         qty = float(qty)
 
         value = price * qty
-
         key = f"{symbol}:{side}:{price}"
 
-        if value >= ORDER_THRESHOLD:
+        # Ордер меньше $15k или исчез —
+        # считаем, что крупного ордера больше нет
+        if value < ORDER_THRESHOLD:
+            last_alerts.pop(key, None)
+            return
 
-            if key not in last_alerts:
+        # Если этот уровень уже был замечен как крупный,
+        # повторно сообщение НЕ отправляем
+        if key in last_alerts:
+            return
 
-                if key not in last_alerts or time.time() - last_alerts[key] >= ALERT_COOLDOWN:
+        # Новый крупный ордер
+        last_alerts[key] = time.time()
 
-                if side == "BUY":
-
-                    message = (
-                        "⚡ КРУПНЫЙ BUY\n\n"
-                        f"💲 {symbol}\n"
-                        f"🟢 BUY ≥ $15k: ${value:,.0f}\n"
-                        f"💵 Цена уровня: {price}"
-                    )
-
-                else:
-
-                    message = (
-                        "⚡ КРУПНЫЙ SELL\n\n"
-                        f"💲 {symbol}\n"
-                        f"🔴 SELL ≥ $15k: ${value:,.0f}\n"
-                        f"💵 Цена уровня: {price}"
-                    )
-
-                print(message)
-                send_telegram(message)
-
+        if side == "BUY":
+            message = (
+                "⚡ КРУПНЫЙ BUY\n\n"
+                f"💲 {symbol}\n"
+                f"🟢 BUY ≥ $15k: ${value:,.0f}\n"
+                f"💵 Цена уровня: {price}"
+            )
         else:
+            message = (
+                "⚡ КРУПНЫЙ SELL\n\n"
+                f"💲 {symbol}\n"
+                f"🔴 SELL ≥ $15k: ${value:,.0f}\n"
+                f"💵 Цена уровня: {price}"
+            )
 
-            if key in last_alerts:
-                del last_alerts[key]
+        print(message)
+        send_telegram(message)
 
     except Exception as e:
         print("Ошибка проверки ордера:", e)
