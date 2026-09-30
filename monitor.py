@@ -265,72 +265,132 @@ def check_symbol(symbol):
     if change_current is None:
         return None
 
-    # Сильный рост:
-    # текущая ИЛИ закрытая 1M свеча >= +3%
+    # =========================
+    # ДВИЖЕНИЕ
+    # =========================
+
     strong_rise = (
         change_current >= 3
         or change_closed >= 3
     )
 
-    # Сильное падение:
-    # текущая ИЛИ закрытая 1M свеча <= -3%
     strong_fall = (
         change_current <= -3
         or change_closed <= -3
     )
 
-    # Если движения нет — стакан вообще не проверяем
-    if not strong_rise and not strong_fall:
-        return None
+    # =========================
+    # СТАКАН
+    # =========================
 
     buy_total, sell_total = get_order_book(symbol)
 
-    # =========================
-    # BUY
-    # =========================
-
-    if (
-        strong_rise
-        and buy_total >= ORDER_THRESHOLD
+    buy_strong = (
+        buy_total >= ORDER_THRESHOLD
         and buy_total > sell_total
-    ):
+    )
 
-        signal = "🟢 BUY"
+    sell_strong = (
+        sell_total >= ORDER_THRESHOLD
+        and sell_total > buy_total
+    )
 
-        key = f"{symbol}:BUY"
+    # =========================
+    # СИЛЬНЫЙ BUY
+    # Движение + стакан совпали
+    # =========================
+
+    if strong_rise and buy_strong:
 
         return {
             "symbol": symbol,
-            "signal": signal,
+            "signal": "🚀 СИЛЬНЫЙ BUY",
             "change_current": change_current,
             "change_closed": change_closed,
             "buy": buy_total,
             "sell": sell_total,
-            "key": key
+            "key": f"{symbol}:STRONG_BUY"
         }
 
     # =========================
-    # SELL
+    # СИЛЬНЫЙ SELL
+    # Движение + стакан совпали
     # =========================
 
-    if (
-        strong_fall
-        and sell_total >= ORDER_THRESHOLD
-        and sell_total > buy_total
-    ):
-
-        signal = "🔴 SELL"
-
-        key = f"{symbol}:SELL"
+    if strong_fall and sell_strong:
 
         return {
             "symbol": symbol,
-            "signal": signal,
+            "signal": "🚨 СИЛЬНЫЙ SELL",
             "change_current": change_current,
             "change_closed": change_closed,
             "buy": buy_total,
             "sell": sell_total,
-            "key": key
+            "key": f"{symbol}:STRONG_SELL"
+        }
+
+    # =========================
+    # BUY ТОЛЬКО ПО ДВИЖЕНИЮ
+    # =========================
+
+    if strong_rise:
+
+        return {
+            "symbol": symbol,
+            "signal": "📈 BUY — движение",
+            "change_current": change_current,
+            "change_closed": change_closed,
+            "buy": buy_total,
+            "sell": sell_total,
+            "key": f"{symbol}:MOVE_BUY"
+        }
+
+    # =========================
+    # SELL ТОЛЬКО ПО ДВИЖЕНИЮ
+    # =========================
+
+    if strong_fall:
+
+        return {
+            "symbol": symbol,
+            "signal": "📉 SELL — движение",
+            "change_current": change_current,
+            "change_closed": change_closed,
+            "buy": buy_total,
+            "sell": sell_total,
+            "key": f"{symbol}:MOVE_SELL"
+        }
+
+    # =========================
+    # BUY ТОЛЬКО ПО СТАКАНУ
+    # =========================
+
+    if buy_strong:
+
+        return {
+            "symbol": symbol,
+            "signal": "🟢 BUY — стакан",
+            "change_current": change_current,
+            "change_closed": change_closed,
+            "buy": buy_total,
+            "sell": sell_total,
+            "key": f"{symbol}:BOOK_BUY"
+        }
+
+    # =========================
+    # SELL ТОЛЬКО ПО СТАКАНУ
+    # =========================
+
+    if sell_strong:
+
+        return {
+            "symbol": symbol,
+            "signal": "🔴 SELL — стакан",
+            "change_current": change_current,
+            "change_closed": change_closed,
+            "buy": buy_total,
+            "sell": sell_total,
+            "key": f"{symbol}:BOOK_SELL"
         }
 
     return None
