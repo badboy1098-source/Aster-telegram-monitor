@@ -361,11 +361,7 @@ def check_symbol(symbol):
             "key": f"{symbol}:MOVE_SELL"
         }
 
-    # =========================
-    # BUY ТОЛЬКО ПО СТАКАНУ
-    # =========================
 
-    if buy_strong:
 
 def check_symbol(symbol):
 
