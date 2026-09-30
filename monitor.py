@@ -1,29 +1,46 @@
-import json
 import os
 import time
 import requests
-import websocket
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-WS_BASE = "wss://fstream.asterdex.com/stream?streams="
+# =========================
+# НАСТРОЙКИ
+# =========================
+
+ASTER_BASE = "https://fapi.asterdex.com"
 
 ORDER_THRESHOLD = 15000
 MIN_VOLUME = 50000
 MAX_SYMBOLS = 90
 
+SCAN_INTERVAL = 30
+ALERT_COOLDOWN = 60
+
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-last_alerts = {}
-ALERT_COOLDOWN = 60
+# BTC и ETH полностью исключаем
+EXCLUDED_SYMBOLS = {
+    "BTCUSDT",
+    "ETHUSDT"
+}
 
+last_alerts = {}
+
+
+# =========================
+# TELEGRAM
+# =========================
 
 def send_telegram(message):
+
     if not TELEGRAM_TOKEN or not CHAT_ID:
         print("⚠️ Telegram не настроен")
         print(message)
         return
 
     try:
+
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
 
         response = requests.post(
@@ -42,28 +59,41 @@ def send_telegram(message):
         print("Ошибка отправки Telegram:", e)
 
 
+# =========================
+# ПОЛУЧАЕМ МОНЕТЫ
+# =========================
+
 def get_symbols():
+
     try:
-        ticker_url = "https://fapi.asterdex.com/fapi/v1/ticker/24hr"
+
+        url = f"{ASTER_BASE}/fapi/v1/ticker/24hr"
 
         response = requests.get(
-            ticker_url,
+            url,
             timeout=10
         )
+
+        response.raise_for_status()
 
         data = response.json()
 
         coins = []
 
         for item in data:
+
             symbol = item.get("symbol", "")
 
             if not symbol.endswith("USDT"):
                 continue
-                if symbol in ("BTCUSDT", "ETHUSDT"):
-    continue
 
-            volume = float(item.get("quoteVolume", 0))
+            if symbol in EXCLUDED_SYMBOLS:
+                continue
+
+            try:
+                volume = float(item.get("quoteVolume", 0))
+            except:
+                volume = 0
 
             if volume < MIN_VOLUME:
                 continue
@@ -73,193 +103,375 @@ def get_symbols():
                 "volume": volume
             })
 
+        # Сначала самые ликвидные
         coins.sort(
             key=lambda x: x["volume"],
             reverse=True
         )
 
         symbols = [
-            x["symbol"].lower()
-            for x in coins[:MAX_SYMBOLS]
+            coin["symbol"]
+            for coin in coins[:MAX_SYMBOLS]
         ]
 
-        print(f"✅ Найдено монет: {len(symbols)}")
+        print(
+            f"✅ Монет для проверки: {len(symbols)}"
+        )
 
         return symbols
 
     except Exception as e:
-        print("Ошибка получения списка монет:", e)
+
+        print(
+            "❌ Ошибка получения списка монет:",
+            e
+        )
+
         return []
 
 
-def check_order(symbol, side, price, qty):
+# =========================
+# 1M СВЕЧИ
+# =========================
+
+def get_1m_change(symbol):
+
     try:
-        price = float(price)
-        qty = float(qty)
 
-        value = price * qty
-        key = f"{symbol}:{side}:{price}"
+        url = f"{ASTER_BASE}/fapi/v1/klines"
 
-        # Ордер меньше $15k или исчез —
-        # считаем, что крупного ордера больше нет
-        if value < ORDER_THRESHOLD:
-            last_alerts.pop(key, None)
-            return
+        params = {
+            "symbol": symbol,
+            "interval": "1m",
+            "limit": 2
+        }
 
-        # Если этот уровень уже был замечен как крупный,
-        # повторно сообщение НЕ отправляем
-        if key in last_alerts:
-            return
+        response = requests.get(
+            url,
+            params=params,
+            timeout=10
+        )
 
-        # Новый крупный ордер
-        last_alerts[key] = time.time()
+        response.raise_for_status()
 
-        if side == "BUY":
-            message = (
-                "⚡ КРУПНЫЙ BUY\n\n"
-                f"💲 {symbol}\n"
-                f"🟢 BUY ≥ $15k: ${value:,.0f}\n"
-                f"💵 Цена уровня: {price}"
-            )
-        else:
-            message = (
-                "⚡ КРУПНЫЙ SELL\n\n"
-                f"💲 {symbol}\n"
-                f"🔴 SELL ≥ $15k: ${value:,.0f}\n"
-                f"💵 Цена уровня: {price}"
-            )
+        klines = response.json()
 
-        print(message)
-        send_telegram(message)
+        if not klines or len(klines) < 2:
+            return None, None
+
+        # Текущая свеча
+        current = klines[-1]
+
+        # Предыдущая закрытая свеча
+        closed = klines[-2]
+
+        current_open = float(current[1])
+        current_close = float(current[4])
+
+        closed_open = float(closed[1])
+        closed_close = float(closed[4])
+
+        if current_open == 0 or closed_open == 0:
+            return None, None
+
+        change_current = (
+            (current_close - current_open)
+            / current_open
+        ) * 100
+
+        change_closed = (
+            (closed_close - closed_open)
+            / closed_open
+        ) * 100
+
+        return change_current, change_closed
 
     except Exception as e:
-        print("Ошибка проверки ордера:", e)
+
+        print(
+            f"Ошибка 1M {symbol}:",
+            e
+        )
+
+        return None, None
 
 
-def on_message(ws, message):
+# =========================
+# СТАКАН
+# =========================
+
+def get_order_book(symbol):
+
     try:
-        data = json.loads(message)
 
-        if "data" in data:
-            data = data["data"]
+        url = f"{ASTER_BASE}/fapi/v1/depth"
 
-        if data.get("e") != "depthUpdate":
-            return
+        params = {
+            "symbol": symbol,
+            "limit": 20
+        }
 
-        symbol = data.get("s", "UNKNOWN")
+        response = requests.get(
+            url,
+            params=params,
+            timeout=10
+        )
 
-        for price, qty in data.get("b", []):
-            price = float(price)
-            qty = float(qty)
+        response.raise_for_status()
 
-            value = price * qty
-            key = f"{symbol}:BUY:{price}"
+        data = response.json()
 
-            if value >= ORDER_THRESHOLD:
-                if key not in last_alerts:
-                    last_alerts[key] = True
+        buy_total = 0
+        sell_total = 0
 
-                    message = (
-                        "⚡ КРУПНЫЙ BUY\n\n"
-                        f"💲 {symbol}\n"
-                        f"🟢 BUY ≥ $15k: ${value:,.0f}\n"
-                        f"💵 Цена уровня: {price}"
-                    )
+        # BUY
+        for price, qty in data.get("bids", []):
 
-                    print(message)
-                    send_telegram(message)
-
-            else:
-                last_alerts.pop(key, None)
-
-        for price, qty in data.get("a", []):
-            price = float(price)
-            qty = float(qty)
-
-            value = price * qty
-            key = f"{symbol}:SELL:{price}"
+            value = float(price) * float(qty)
 
             if value >= ORDER_THRESHOLD:
-                if key not in last_alerts:
-                    last_alerts[key] = True
+                buy_total += value
 
-                    message = (
-                        "⚡ КРУПНЫЙ SELL\n\n"
-                        f"💲 {symbol}\n"
-                        f"🔴 SELL ≥ $15k: ${value:,.0f}\n"
-                        f"💵 Цена уровня: {price}"
-                    )
+        # SELL
+        for price, qty in data.get("asks", []):
 
-                    print(message)
-                    send_telegram(message)
+            value = float(price) * float(qty)
 
-            else:
-                last_alerts.pop(key, None)
+            if value >= ORDER_THRESHOLD:
+                sell_total += value
+
+        return buy_total, sell_total
 
     except Exception as e:
-        print("Ошибка обработки WebSocket:", e)
+
+        print(
+            f"Ошибка стакана {symbol}:",
+            e
+        )
+
+        return 0, 0
 
 
-def on_error(ws, error):
-    print("⚠️ WebSocket ошибка:", error)
+# =========================
+# ПРОВЕРКА ОДНОЙ МОНЕТЫ
+# =========================
 
+def check_symbol(symbol):
 
-def on_close(ws, close_status_code, close_msg):
-    print(
-        "🔴 WebSocket отключён:",
-        close_status_code,
-        close_msg
+    if symbol in EXCLUDED_SYMBOLS:
+        return None
+
+    change_current, change_closed = get_1m_change(symbol)
+
+    if change_current is None:
+        return None
+
+    # Сильный рост:
+    # текущая ИЛИ закрытая 1M свеча >= +3%
+    strong_rise = (
+        change_current >= 3
+        or change_closed >= 3
     )
 
+    # Сильное падение:
+    # текущая ИЛИ закрытая 1M свеча <= -3%
+    strong_fall = (
+        change_current <= -3
+        or change_closed <= -3
+    )
 
-def on_open(ws):
-    print("🟢 WebSocket подключён")
-    print("⚡ Мониторинг крупных ордеров запущен")
+    # Если движения нет — стакан вообще не проверяем
+    if not strong_rise and not strong_fall:
+        return None
+
+    buy_total, sell_total = get_order_book(symbol)
+
+    # =========================
+    # BUY
+    # =========================
+
+    if (
+        strong_rise
+        and buy_total >= ORDER_THRESHOLD
+        and buy_total > sell_total
+    ):
+
+        signal = "🟢 BUY"
+
+        key = f"{symbol}:BUY"
+
+        return {
+            "symbol": symbol,
+            "signal": signal,
+            "change_current": change_current,
+            "change_closed": change_closed,
+            "buy": buy_total,
+            "sell": sell_total,
+            "key": key
+        }
+
+    # =========================
+    # SELL
+    # =========================
+
+    if (
+        strong_fall
+        and sell_total >= ORDER_THRESHOLD
+        and sell_total > buy_total
+    ):
+
+        signal = "🔴 SELL"
+
+        key = f"{symbol}:SELL"
+
+        return {
+            "symbol": symbol,
+            "signal": signal,
+            "change_current": change_current,
+            "change_closed": change_closed,
+            "buy": buy_total,
+            "sell": sell_total,
+            "key": key
+        }
+
+    return None
 
 
-def run_monitor():
+# =========================
+# ОТПРАВКА СИГНАЛА
+# =========================
+
+def send_signal(result):
+
+    if not result:
+        return
+
+    key = result["key"]
+
+    now = time.time()
+
+    # Не отправляем тот же сигнал чаще 1 раза в минуту
+    if key in last_alerts:
+
+        if now - last_alerts[key] < ALERT_COOLDOWN:
+            return
+
+    last_alerts[key] = now
+
+    symbol = result["symbol"]
+
+    message = (
+        f"🚨 СИГНАЛ Aster DEX\n\n"
+        f"💲 {symbol}\n"
+        f"📌 Сигнал: {result['signal']}\n\n"
+        f"📈 1M текущая: "
+        f"{result['change_current']:+.2f}%\n"
+        f"🕐 1M закрытая: "
+        f"{result['change_closed']:+.2f}%\n\n"
+        f"🟢 BUY ≥ $15k: "
+        f"${result['buy']:,.0f}\n"
+        f"🔴 SELL ≥ $15k: "
+        f"${result['sell']:,.0f}"
+    )
+
+    print(message)
+
+    send_telegram(message)
+
+
+# =========================
+# ОДИН ЦИКЛ СКАНИРОВАНИЯ
+# =========================
+
+def scan():
+
+    print("\n==============================")
+    print("🔥 Aster DEX — новый скан")
+    print("==============================")
 
     symbols = get_symbols()
 
     if not symbols:
-        print("❌ Не удалось получить список монет")
         return
 
-    streams = []
+    results = []
 
-    for symbol in symbols:
-        streams.append(
-            f"{symbol}@depth20@100ms"
+    # Проверяем монеты параллельно,
+    # чтобы не ждать каждую по очереди
+    with ThreadPoolExecutor(
+        max_workers=10
+    ) as executor:
+
+        futures = {
+            executor.submit(
+                check_symbol,
+                symbol
+            ): symbol
+            for symbol in symbols
+        }
+
+        for future in as_completed(futures):
+
+            symbol = futures[future]
+
+            try:
+
+                result = future.result()
+
+                if result:
+                    results.append(result)
+
+            except Exception as e:
+
+                print(
+                    f"Ошибка проверки {symbol}:",
+                    e
+                )
+
+    # Сначала выводим найденные сигналы
+    if results:
+
+        print(
+            f"\n🚨 Найдено сигналов: "
+            f"{len(results)}"
         )
 
-    ws_url = WS_BASE + "/".join(streams)
+        for result in results:
+            send_signal(result)
 
-    print("📡 Подключаемся к Aster...")
-    print(f"📊 Потоков: {len(streams)}")
+    else:
 
-    ws = websocket.WebSocketApp(
-        ws_url,
-        on_open=on_open,
-        on_message=on_message,
-        on_error=on_error,
-        on_close=on_close
-    )
+        print(
+            "⚪ Подходящих сигналов нет"
+        )
 
-    ws.run_forever(
-        ping_interval=60,
-        ping_timeout=30
-    )
 
+# =========================
+# ЗАПУСК
+# =========================
+
+print("🚀 Aster Monitor запущен")
+print("🚫 BTCUSDT и ETHUSDT исключены")
+print("📊 Порог движения: ±3% за 1M")
+print("💰 Порог стакана: $15,000")
+print("⏱ Интервал сканирования: 30 секунд")
 
 while True:
 
     try:
 
-        run_monitor()
+        scan()
 
     except Exception as e:
 
-        print("❌ Ошибка монитора:", e)
+        print(
+            "❌ Ошибка основного цикла:",
+            e
+        )
 
-    print("🔄 Переподключение через 5 секунд...")
-    time.sleep(5)
+    print(
+        f"\n🔄 Следующий скан через "
+        f"{SCAN_INTERVAL} секунд..."
+    )
+
+    time.sleep(SCAN_INTERVAL)
