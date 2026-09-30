@@ -278,12 +278,33 @@ def check_symbol(symbol):
         or change_closed <= -3
     )
 
-    # Если движения ±3% нет — сигнал не создаём
-    if not strong_rise and not strong_fall:
+    #     # Если движение меньше ±2% — ничего не создаём
+    if (
+        abs(change_current) < 2
+        and abs(change_closed) < 2
+    ):
         return None
 
     buy_total, sell_total = get_order_book(symbol)
 
+    # =========================
+    # 👀 НАБЛЮДЕНИЕ
+    # =========================
+
+    watch_rise = (
+        (change_current >= 2 or change_closed >= 2)
+        and buy_total >= 10000
+        and buy_total > sell_total
+    )
+
+    watch_fall = (
+        (change_current <= -2 or change_closed <= -2)
+        and sell_total >= 10000
+        and sell_total > buy_total
+    )
+
+    # Если уже выполнены условия сильного сигнала,
+    # ниже код продолжит проверку STRONG BUY/SELL
     # СИЛЬНЫЙ BUY:
     # движение вверх + крупный BUY в стакане
     if (
