@@ -266,47 +266,45 @@ def check_symbol(symbol):
     if change_current is None:
         return None
 
-    # Сильный рост
+    # =========================
+    # СИЛЬНОЕ ДВИЖЕНИЕ ±3%
+    # =========================
+
     strong_rise = (
         change_current >= 3
         or change_closed >= 3
     )
 
-    # Сильное падение
     strong_fall = (
         change_current <= -3
         or change_closed <= -3
     )
 
-    #     # Если движение меньше ±2% — ничего не создаём
-    if (
-        abs(change_current) < 2
-        and abs(change_closed) < 2
-    ):
+    # =========================
+    # ДВИЖЕНИЕ ДЛЯ НАБЛЮДЕНИЯ ±2%
+    # =========================
+
+    watch_rise = (
+        change_current >= 2
+        or change_closed >= 2
+    )
+
+    watch_fall = (
+        change_current <= -2
+        or change_closed <= -2
+    )
+
+    # Если движение меньше ±2% —
+    # монету вообще не проверяем
+    if not watch_rise and not watch_fall:
         return None
 
     buy_total, sell_total = get_order_book(symbol)
 
     # =========================
-    # 👀 НАБЛЮДЕНИЕ
+    # 🚨 СИЛЬНЫЙ BUY
     # =========================
 
-    watch_rise = (
-        (change_current >= 2 or change_closed >= 2)
-        and buy_total >= 10000
-        and buy_total > sell_total
-    )
-
-    watch_fall = (
-        (change_current <= -2 or change_closed <= -2)
-        and sell_total >= 10000
-        and sell_total > buy_total
-    )
-
-    # Если уже выполнены условия сильного сигнала,
-    # ниже код продолжит проверку STRONG BUY/SELL
-    # СИЛЬНЫЙ BUY:
-    # движение вверх + крупный BUY в стакане
     if (
         strong_rise
         and buy_total >= ORDER_THRESHOLD
@@ -322,8 +320,10 @@ def check_symbol(symbol):
             "key": f"{symbol}:STRONG_BUY"
         }
 
-    # СИЛЬНЫЙ SELL:
-    # движение вниз + крупный SELL в стакане
+    # =========================
+    # 🚨 СИЛЬНЫЙ SELL
+    # =========================
+
     if (
         strong_fall
         and sell_total >= ORDER_THRESHOLD
@@ -337,6 +337,44 @@ def check_symbol(symbol):
             "buy": buy_total,
             "sell": sell_total,
             "key": f"{symbol}:STRONG_SELL"
+        }
+
+    # =========================
+    # 👀 НАБЛЮДЕНИЕ BUY
+    # =========================
+
+    if (
+        watch_rise
+        and buy_total >= 10000
+        and buy_total > sell_total
+    ):
+        return {
+            "symbol": symbol,
+            "signal": "👀 НАБЛЮДЕНИЕ BUY",
+            "change_current": change_current,
+            "change_closed": change_closed,
+            "buy": buy_total,
+            "sell": sell_total,
+            "key": f"{symbol}:WATCH_BUY"
+        }
+
+    # =========================
+    # 👀 НАБЛЮДЕНИЕ SELL
+    # =========================
+
+    if (
+        watch_fall
+        and sell_total >= 10000
+        and sell_total > buy_total
+    ):
+        return {
+            "symbol": symbol,
+            "signal": "👀 НАБЛЮДЕНИЕ SELL",
+            "change_current": change_current,
+            "change_closed": change_closed,
+            "buy": buy_total,
+            "sell": sell_total,
+            "key": f"{symbol}:WATCH_SELL"
         }
 
     return None
