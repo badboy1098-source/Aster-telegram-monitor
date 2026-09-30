@@ -14,6 +14,7 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
 last_alerts = {}
+ALERT_COOLDOWN = 60
 
 
 def send_telegram(message):
