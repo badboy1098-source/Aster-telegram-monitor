@@ -367,30 +367,66 @@ def check_symbol(symbol):
 
     if buy_strong:
 
+def check_symbol(symbol):
+
+    if symbol in EXCLUDED_SYMBOLS:
+        return None
+
+    change_current, change_closed = get_1m_change(symbol)
+
+    if change_current is None:
+        return None
+
+    # Сильный рост
+    strong_rise = (
+        change_current >= 3
+        or change_closed >= 3
+    )
+
+    # Сильное падение
+    strong_fall = (
+        change_current <= -3
+        or change_closed <= -3
+    )
+
+    # Если движения ±3% нет — сигнал не создаём
+    if not strong_rise and not strong_fall:
+        return None
+
+    buy_total, sell_total = get_order_book(symbol)
+
+    # СИЛЬНЫЙ BUY:
+    # движение вверх + крупный BUY в стакане
+    if (
+        strong_rise
+        and buy_total >= ORDER_THRESHOLD
+        and buy_total > sell_total
+    ):
         return {
             "symbol": symbol,
-            "signal": "🟢 BUY — стакан",
+            "signal": "🚀 СИЛЬНЫЙ BUY",
             "change_current": change_current,
             "change_closed": change_closed,
             "buy": buy_total,
             "sell": sell_total,
-            "key": f"{symbol}:BOOK_BUY"
+            "key": f"{symbol}:STRONG_BUY"
         }
 
-    # =========================
-    # SELL ТОЛЬКО ПО СТАКАНУ
-    # =========================
-
-    if sell_strong:
-
+    # СИЛЬНЫЙ SELL:
+    # движение вниз + крупный SELL в стакане
+    if (
+        strong_fall
+        and sell_total >= ORDER_THRESHOLD
+        and sell_total > buy_total
+    ):
         return {
             "symbol": symbol,
-            "signal": "🔴 SELL — стакан",
+            "signal": "🚨 СИЛЬНЫЙ SELL",
             "change_current": change_current,
             "change_closed": change_closed,
             "buy": buy_total,
             "sell": sell_total,
-            "key": f"{symbol}:BOOK_SELL"
+            "key": f"{symbol}:STRONG_SELL"
         }
 
     return None
