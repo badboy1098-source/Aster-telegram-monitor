@@ -11,7 +11,6 @@ ASTER_BASE = "https://fapi.asterdex.com"
 
 ORDER_THRESHOLD = 15000
 MIN_VOLUME = 50000
-MAX_SYMBOLS = 90
 
 SCAN_INTERVAL = 30
 ALERT_COOLDOWN = 60
@@ -110,8 +109,8 @@ def get_symbols():
         )
 
         symbols = [
-            coin["symbol"]
-            for coin in coins[:MAX_SYMBOLS]
+    coin["symbol"]
+    for coin in coins
         ]
 
         print(
