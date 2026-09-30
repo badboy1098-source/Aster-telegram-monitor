@@ -103,7 +103,7 @@ def check_order(symbol, side, price, qty):
 
             if key not in last_alerts:
 
-                last_alerts[key] = time.time()
+                if key not in last_alerts or time.time() - last_alerts[key] >= ALERT_COOLDOWN:
 
                 if side == "BUY":
 
