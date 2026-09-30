@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 ASTER_BASE = "https://fapi.asterdex.com"
 
 ORDER_THRESHOLD = 15000
-MIN_VOLUME = 50000
+MIN_VOLUME = 15000
 
 SCAN_INTERVAL = 30
 ALERT_COOLDOWN = 60
