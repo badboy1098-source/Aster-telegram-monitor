@@ -60,6 +60,8 @@ def get_symbols():
 
             if not symbol.endswith("USDT"):
                 continue
+                if symbol in ("BTCUSDT", "ETHUSDT"):
+    continue
 
             volume = float(item.get("quoteVolume", 0))
 
