@@ -1,12 +1,33 @@
 import json
+import os
+import requests
 import websocket
 
 WS_URL = "wss://fstream.asterdex.com/ws/btcusdt@depth20@100ms"
 
 ORDER_THRESHOLD = 15000
 
-print("🤖 Aster Monitor запущен")
-print("📡 Слушаем BTCUSDT...")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
+
+
+def send_telegram(message):
+    if not TELEGRAM_TOKEN or not CHAT_ID:
+        print("⚠️ Telegram пока не настроен")
+        print(message)
+        return
+
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+
+    requests.post(
+        url,
+        json={
+            "chat_id": CHAT_ID,
+            "text": message
+        },
+        timeout=10
+    )
+
 
 def on_message(ws, message):
     try:
@@ -21,19 +42,29 @@ def on_message(ws, message):
             value = float(price) * float(qty)
 
             if value >= ORDER_THRESHOLD:
-                print(
-                    f"🟢 BUY ≥ $15k | {symbol} | "
-                    f"${value:,.0f} | цена {price}"
+                message = (
+                    "⚡ КРУПНЫЙ BUY\n\n"
+                    f"💲 {symbol}\n"
+                    f"🟢 BUY ≥ $15k: ${value:,.0f}\n"
+                    f"💵 Цена уровня: {price}"
                 )
+
+                print(message)
+                send_telegram(message)
 
         for price, qty in data.get("a", []):
             value = float(price) * float(qty)
 
             if value >= ORDER_THRESHOLD:
-                print(
-                    f"🔴 SELL ≥ $15k | {symbol} | "
-                    f"${value:,.0f} | цена {price}"
+                message = (
+                    "⚡ КРУПНЫЙ SELL\n\n"
+                    f"💲 {symbol}\n"
+                    f"🔴 SELL ≥ $15k: ${value:,.0f}\n"
+                    f"💵 Цена уровня: {price}"
                 )
+
+                print(message)
+                send_telegram(message)
 
     except Exception as e:
         print("Ошибка:", e)
@@ -49,6 +80,7 @@ def on_close(ws, close_status_code, close_msg):
 
 def on_open(ws):
     print("✅ WebSocket подключён")
+    print("📡 Слушаем BTCUSDT...")
 
 
 ws = websocket.WebSocketApp(
