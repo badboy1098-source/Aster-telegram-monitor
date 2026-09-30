@@ -18,8 +18,8 @@ jobs:
 
       - name: Установить библиотеки
         run: pip install -r requirements.txt
-
-      run: python -u monitor.py
+- name: Запустить монитор
+  run: python -u monitor.py
       
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
