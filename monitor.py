@@ -767,6 +767,25 @@ def scan():
         print(
             "⚪ Подходящих сигналов нет"
         )
+            # =========================
+    # 🔎 ОТПРАВКА ПРЕДСИГНАЛОВ
+    # =========================
+
+    if pre_results:
+
+        print(
+            f"\n🔎 Найдено предсигналов: "
+            f"{len(pre_results)}"
+        )
+
+        for pre_result in pre_results:
+            send_pre_signal(pre_result)
+
+    else:
+
+        print(
+            "🔎 Предсигналов нет"
+        )
 
 
 # =========================
