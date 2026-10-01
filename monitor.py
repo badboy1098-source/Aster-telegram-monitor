@@ -223,8 +223,23 @@ def get_order_book(symbol):
         buy_total = 0
         sell_total = 0
 
+        # Лучшая цена BUY
+        best_bid = None
+
+        # Лучшая цена SELL
+        best_ask = None
+
+        bids = data.get("bids", [])
+        asks = data.get("asks", [])
+
+        if bids:
+            best_bid = float(bids[0][0])
+
+        if asks:
+            best_ask = float(asks[0][0])
+
         # BUY
-        for price, qty in data.get("bids", []):
+        for price, qty in bids:
 
             value = float(price) * float(qty)
 
@@ -232,14 +247,19 @@ def get_order_book(symbol):
                 buy_total += value
 
         # SELL
-        for price, qty in data.get("asks", []):
+        for price, qty in asks:
 
             value = float(price) * float(qty)
 
             if value >= ORDER_THRESHOLD:
                 sell_total += value
 
-        return buy_total, sell_total
+        return (
+            buy_total,
+            sell_total,
+            best_bid,
+            best_ask
+        )
 
     except Exception as e:
 
@@ -248,12 +268,7 @@ def get_order_book(symbol):
             e
         )
 
-        return 0, 0
-
-
-# =========================
-# ПРОВЕРКА ОДНОЙ МОНЕТЫ
-# =========================
+        return 0, 0, None, None
 
 
 def check_symbol(symbol):
@@ -299,7 +314,7 @@ def check_symbol(symbol):
     if not watch_rise and not watch_fall:
         return None
 
-    buy_total, sell_total = get_order_book(symbol)
+    buy_total, sell_total, best_bid, best_ask = get_order_book(symbol)
 
     # =========================
     # 🚨 СИЛЬНЫЙ BUY
@@ -317,6 +332,10 @@ def check_symbol(symbol):
             "change_closed": change_closed,
             "buy": buy_total,
             "sell": sell_total,
+            "entry": best_ask,
+"stop": best_ask * 0.99 if best_ask else None,
+"tp1": best_ask * 1.015 if best_ask else None,
+"tp2": best_ask * 1.025 if best_ask else None,
             "key": f"{symbol}:STRONG_BUY"
         }
 
@@ -336,6 +355,10 @@ def check_symbol(symbol):
             "change_closed": change_closed,
             "buy": buy_total,
             "sell": sell_total,
+            "entry": best_bid,
+"stop": best_bid * 1.01 if best_bid else None,
+"tp1": best_bid * 0.985 if best_bid else None,
+"tp2": best_bid * 0.975 if best_bid else None,
             "key": f"{symbol}:STRONG_SELL"
         }
 
@@ -402,6 +425,25 @@ def send_signal(result):
     last_alerts[key] = now
 
     symbol = result["symbol"]
+        levels = ""
+
+    if result["signal"] == "🚀 СИЛЬНЫЙ BUY" and result.get("entry"):
+        levels = (
+            f"\n\n🎯 ТОЧКА ВХОДА\n"
+            f"💵 Вход: {result['entry']:.8f}\n"
+            f"🛑 Stop Loss: {result['stop']:.8f}\n"
+            f"🎯 TP1: {result['tp1']:.8f}\n"
+            f"🎯 TP2: {result['tp2']:.8f}"
+        )
+
+    elif result["signal"] == "🚨 СИЛЬНЫЙ SELL" and result.get("entry"):
+        levels = (
+            f"\n\n🎯 ТОЧКА ВХОДА\n"
+            f"💵 Вход: {result['entry']:.8f}\n"
+            f"🛑 Stop Loss: {result['stop']:.8f}\n"
+            f"🎯 TP1: {result['tp1']:.8f}\n"
+            f"🎯 TP2: {result['tp2']:.8f}"
+        )
 
     message = (
         f"🚨 СИГНАЛ Aster DEX\n\n"
@@ -415,6 +457,8 @@ def send_signal(result):
         f"${result['buy']:,.0f}\n"
         f"🔴 SELL ≥ $15k: "
         f"${result['sell']:,.0f}"
+                f"${result['sell']:,.0f}"
+        f"{levels}"
     )
 
     print(message)
