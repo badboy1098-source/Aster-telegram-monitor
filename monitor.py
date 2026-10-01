@@ -369,14 +369,186 @@ buy_total, sell_total, best_bid, best_ask = get_order_book(symbol)
 
         # =========================
         # ПРЕДСИГНАЛ SELL
+def get_pre_signal(symbol):
+
+    try:
+
+        url = f"{ASTER_BASE}/fapi/v1/klines"
+
+        params = {
+            "symbol": symbol,
+            "interval": "1m",
+            "limit": 61
+        }
+
+        response = requests.get(
+            url,
+            params=params,
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        klines = response.json()
+
+        if not klines or len(klines) < 61:
+            return None
+
+        candles = klines[-61:-1]
+
+        changes = []
+        volumes = []
+
+        for candle in candles:
+
+            open_price = float(candle[1])
+            close_price = float(candle[4])
+            volume = float(candle[5])
+
+            if open_price == 0:
+                return None
+
+            change = (
+                (close_price - open_price)
+                / open_price
+            ) * 100
+
+            changes.append(change)
+            volumes.append(volume)
+
+        # =========================
+        # ДВИЖЕНИЕ ЗА ЧАС
         # =========================
 
-        if (
+        first_open = float(candles[0][1])
+        last_close = float(candles[-1][4])
+
+        if first_open == 0:
+            return None
+
+        hour_change = (
+            (last_close - first_open)
+            / first_open
+        ) * 100
+
+        # =========================
+        # ПОСЛЕДНИЕ 15 МИНУТ
+        # =========================
+
+        last_15 = changes[-15:]
+
+        last_15_change = sum(last_15)
+
+        # =========================
+        # ПРЕДЫДУЩИЕ 15 МИНУТ
+        # =========================
+
+        previous_15 = changes[-30:-15]
+
+        previous_15_change = sum(previous_15)
+
+        # =========================
+        # УСКОРЕНИЕ
+        # =========================
+
+        acceleration_up = (
+            last_15_change > previous_15_change
+        )
+
+        acceleration_down = (
+            last_15_change < previous_15_change
+        )
+
+        # =========================
+        # ОБЪЁМ
+        # =========================
+
+        previous_volume = sum(
+            volumes[-30:-15]
+        )
+
+        last_volume = sum(
+            volumes[-15:]
+        )
+
+        volume_rising = (
+            last_volume > previous_volume * 1.10
+        )
+
+        # =========================
+        # СВЕЧИ
+        # =========================
+
+        green_count = sum(
+            1
+            for change in last_15
+            if change > 0
+        )
+
+        red_count = sum(
+            1
+            for change in last_15
+            if change < 0
+        )
+
+        # =========================
+        # СНАЧАЛА ПРОВЕРЯЕМ ДВИЖЕНИЕ
+        # =========================
+
+        possible_buy = (
+            hour_change > 0.5
+            and last_15_change > 0.5
+            and acceleration_up
+            and volume_rising
+            and green_count >= 9
+        )
+
+        possible_sell = (
             hour_change < -0.5
             and last_15_change < -0.5
             and acceleration_down
             and volume_rising
             and red_count >= 9
+        )
+
+        if not possible_buy and not possible_sell:
+            return None
+
+        # =========================
+        # ТЕПЕРЬ ПРОВЕРЯЕМ СТАКАН
+        # =========================
+
+        buy_total, sell_total, best_bid, best_ask = (
+            get_order_book(symbol)
+        )
+
+        # =========================
+        # ПРЕДСИГНАЛ BUY
+        # =========================
+
+        if (
+            possible_buy
+            and buy_total > sell_total
+        ):
+
+            return {
+                "symbol": symbol,
+                "direction": "🔎 ВОЗМОЖНЫЙ BUY",
+                "hour_change": hour_change,
+                "last_15_change": last_15_change,
+                "price": last_close,
+                "buy": buy_total,
+                "sell": sell_total,
+                "entry": last_close,
+                "key": f"{symbol}:PRE_BUY"
+            }
+
+        # =========================
+        # ПРЕДСИГНАЛ SELL
+        # =========================
+
+        if (
+            possible_sell
             and sell_total > buy_total
         ):
 
