@@ -34,6 +34,11 @@ def get_subscribers():
             headers=headers,
             timeout=10
         )
+        print(
+    "SUPABASE:",
+    response.status_code,
+    response.text
+        )
 
         response.raise_for_status()
 
