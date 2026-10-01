@@ -2,6 +2,102 @@ import os
 import time
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
+# =========================================================
+# SUPABASE — ПОДПИСЧИКИ TELEGRAM
+# =========================================================
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SECRET = os.getenv("SUPABASE_SECRET")
+
+
+def get_subscribers():
+
+    if not SUPABASE_URL or not SUPABASE_SECRET:
+        print("❌ SUPABASE настройки не найдены")
+        return []
+
+    url = (
+        f"{SUPABASE_URL}"
+        f"/rest/v1/subscribers"
+        f"?select=chat_id"
+    )
+
+    headers = {
+        "apikey": SUPABASE_SECRET,
+        "Authorization": f"Bearer {SUPABASE_SECRET}"
+    }
+
+    try:
+
+        response = requests.get(
+            url,
+            headers=headers,
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        data = response.json()
+
+        return [
+            str(item["chat_id"])
+            for item in data
+            if item.get("chat_id")
+        ]
+
+    except Exception as e:
+
+        print(
+            "❌ Ошибка получения подписчиков:",
+            e
+        )
+
+        return []
+
+
+def add_subscriber(chat_id):
+
+    if not SUPABASE_URL or not SUPABASE_SECRET:
+        print("❌ SUPABASE настройки не найдены")
+        return False
+
+    url = (
+        f"{SUPABASE_URL}"
+        f"/rest/v1/subscribers"
+    )
+
+    headers = {
+        "apikey": SUPABASE_SECRET,
+        "Authorization": f"Bearer {SUPABASE_SECRET}",
+        "Content-Type": "application/json",
+        "Prefer": "resolution=merge-duplicates"
+    }
+
+    data = {
+        "chat_id": str(chat_id)
+    }
+
+    try:
+
+        response = requests.post(
+            url,
+            headers=headers,
+            json=data,
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        return True
+
+    except Exception as e:
+
+        print(
+            "❌ Ошибка добавления подписчика:",
+            e
+        )
+
+        return False
 
 
 # =========================================================
