@@ -1042,7 +1042,129 @@ def main():
             SCAN_INTERVAL
         )
 
+# =========================================================
+# TELEGRAM — ПОДПИСКА ПОЛЬЗОВАТЕЛЕЙ
+# =========================================================
 
+def send_telegram_to_chat(chat_id, message):
+
+    if not TELEGRAM_TOKEN:
+        return
+
+    url = (
+        f"https://api.telegram.org/"
+        f"bot{TELEGRAM_TOKEN}/sendMessage"
+    )
+
+    data = {
+        "chat_id": str(chat_id),
+        "text": message
+    }
+
+    try:
+
+        response = requests.post(
+            url,
+            json=data,
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+    except Exception as e:
+
+        print(
+            f"❌ Ошибка отправки {chat_id}:",
+            e
+        )
+
+
+def poll_telegram():
+
+    offset = None
+
+    print(
+        "📩 Telegram подписки запущены"
+    )
+
+    while True:
+
+        try:
+
+            url = (
+                f"https://api.telegram.org/"
+                f"bot{TELEGRAM_TOKEN}/getUpdates"
+            )
+
+            params = {
+                "timeout": 25
+            }
+
+            if offset is not None:
+                params["offset"] = offset
+
+            response = requests.get(
+                url,
+                params=params,
+                timeout=35
+            )
+
+            response.raise_for_status()
+
+            updates = response.json().get(
+                "result",
+                []
+            )
+
+            for update in updates:
+
+                offset = update["update_id"] + 1
+
+                message = update.get(
+                    "message"
+                )
+
+                if not message:
+                    continue
+
+                chat = message.get(
+                    "chat",
+                    {}
+                )
+
+                chat_id = chat.get(
+                    "id"
+                )
+
+                text = (
+                    message.get("text") or ""
+                ).strip()
+
+                if not chat_id:
+                    continue
+
+                if text.startswith("/start"):
+
+                    if add_subscriber(chat_id):
+
+                        send_telegram_to_chat(
+                            chat_id,
+                            "✅ Ты подписан на сигналы Aster DEX!\n\n"
+                            "🔥 Бот будет автоматически присылать "
+                            "сигналы и предсигналы.\n\n"
+                            "📊 Порог движения: ±3% за 1M\n"
+                            "💰 Стакан: от $15,000"
+                        )
+
+        except Exception as e:
+
+            print(
+                "❌ Ошибка Telegram:",
+                e
+            )
+
+            time.sleep(5)
+            
 # =========================================================
 # START
 # =========================================================
