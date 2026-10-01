@@ -303,6 +303,112 @@ def get_pre_signal(symbol):
         # КОЛИЧЕСТВО ЗЕЛЁНЫХ / КРАСНЫХ
         # =========================
 
+def get_pre_signal(symbol):
+
+    try:
+
+        url = f"{ASTER_BASE}/fapi/v1/klines"
+
+        params = {
+            "symbol": symbol,
+            "interval": "1m",
+            "limit": 61
+        }
+
+        response = requests.get(
+            url,
+            params=params,
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        klines = response.json()
+
+        if not klines or len(klines) < 61:
+            return None
+
+        # 60 последних закрытых свечей
+        candles = klines[-61:-1]
+
+        changes = []
+        volumes = []
+
+        for candle in candles:
+
+            open_price = float(candle[1])
+            close_price = float(candle[4])
+            volume = float(candle[5])
+
+            if open_price == 0:
+                return None
+
+            change = (
+                (close_price - open_price)
+                / open_price
+            ) * 100
+
+            changes.append(change)
+            volumes.append(volume)
+
+        # =========================
+        # ОБЩЕЕ ДВИЖЕНИЕ ЗА ЧАС
+        # =========================
+
+        first_open = float(candles[0][1])
+        last_close = float(candles[-1][4])
+
+        if first_open == 0:
+            return None
+
+        hour_change = (
+            (last_close - first_open)
+            / first_open
+        ) * 100
+
+        # =========================
+        # ПОСЛЕДНИЕ 15 МИНУТ
+        # =========================
+
+        last_15 = changes[-15:]
+
+        last_15_change = sum(last_15)
+
+        # =========================
+        # ПРЕДЫДУЩИЕ 15 МИНУТ
+        # =========================
+
+        previous_15 = changes[-30:-15]
+
+        previous_15_change = sum(previous_15)
+
+        # =========================
+        # УСКОРЕНИЕ
+        # =========================
+
+        acceleration_up = (
+            last_15_change > previous_15_change
+        )
+
+        acceleration_down = (
+            last_15_change < previous_15_change
+        )
+
+        # =========================
+        # ОБЪЁМ
+        # =========================
+
+        previous_volume = sum(volumes[-30:-15])
+        last_volume = sum(volumes[-15:])
+
+        volume_rising = (
+            last_volume > previous_volume * 1.10
+        )
+
+        # =========================
+        # СВЕЧИ
+        # =========================
+
         green_count = sum(
             1 for change in last_15
             if change > 0
@@ -314,7 +420,13 @@ def get_pre_signal(symbol):
         )
 
         # =========================
-        # 🔎 ПРЕДСИГНАЛ BUY
+        # СТАКАН
+        # =========================
+
+        buy_total, sell_total = get_order_book(symbol)
+
+        # =========================
+        # ПРЕДСИГНАЛ BUY
         # =========================
 
         if (
@@ -323,6 +435,7 @@ def get_pre_signal(symbol):
             and acceleration_up
             and volume_rising
             and green_count >= 9
+            and buy_total > sell_total
         ):
 
             return {
@@ -331,11 +444,14 @@ def get_pre_signal(symbol):
                 "hour_change": hour_change,
                 "last_15_change": last_15_change,
                 "price": last_close,
+                "buy": buy_total,
+                "sell": sell_total,
+                "entry": last_close,
                 "key": f"{symbol}:PRE_BUY"
             }
 
         # =========================
-        # 🔎 ПРЕДСИГНАЛ SELL
+        # ПРЕДСИГНАЛ SELL
         # =========================
 
         if (
@@ -344,6 +460,7 @@ def get_pre_signal(symbol):
             and acceleration_down
             and volume_rising
             and red_count >= 9
+            and sell_total > buy_total
         ):
 
             return {
@@ -352,6 +469,9 @@ def get_pre_signal(symbol):
                 "hour_change": hour_change,
                 "last_15_change": last_15_change,
                 "price": last_close,
+                "buy": buy_total,
+                "sell": sell_total,
+                "entry": last_close,
                 "key": f"{symbol}:PRE_SELL"
             }
 
@@ -365,7 +485,6 @@ def get_pre_signal(symbol):
         )
 
         return None
-
 
 # =========================
 # 📩 ОТПРАВКА ПРЕДСИГНАЛА
