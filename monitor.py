@@ -700,7 +700,7 @@ def scan():
         return
 
     results = []
-        pre_results = []
+    pre_results = []
 
     # Проверяем монеты параллельно,
     # чтобы не ждать каждую по очереди
