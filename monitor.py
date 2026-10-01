@@ -416,7 +416,7 @@ def send_signal(result):
 
     now = time.time()
 
-    # Не отправляем тот же сигнал чаще 1 раза в минуту
+    # Не отправляем тот же сигнал чаще 1 раза в 5 минут
     if key in last_alerts:
 
         if now - last_alerts[key] < ALERT_COOLDOWN:
@@ -425,9 +425,13 @@ def send_signal(result):
     last_alerts[key] = now
 
     symbol = result["symbol"]
-        levels = ""
 
-    if result["signal"] == "🚀 СИЛЬНЫЙ BUY" and result.get("entry"):
+    levels = ""
+
+    if (
+        result["signal"] == "🚀 СИЛЬНЫЙ BUY"
+        and result.get("entry")
+    ):
         levels = (
             f"\n\n🎯 ТОЧКА ВХОДА\n"
             f"💵 Вход: {result['entry']:.8f}\n"
@@ -436,7 +440,10 @@ def send_signal(result):
             f"🎯 TP2: {result['tp2']:.8f}"
         )
 
-    elif result["signal"] == "🚨 СИЛЬНЫЙ SELL" and result.get("entry"):
+    elif (
+        result["signal"] == "🚨 СИЛЬНЫЙ SELL"
+        and result.get("entry")
+    ):
         levels = (
             f"\n\n🎯 ТОЧКА ВХОДА\n"
             f"💵 Вход: {result['entry']:.8f}\n"
@@ -457,7 +464,6 @@ def send_signal(result):
         f"${result['buy']:,.0f}\n"
         f"🔴 SELL ≥ $15k: "
         f"${result['sell']:,.0f}"
-                f"${result['sell']:,.0f}"
         f"{levels}"
     )
 
