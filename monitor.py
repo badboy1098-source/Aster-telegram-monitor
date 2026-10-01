@@ -985,8 +985,10 @@ def scan():
 # ЗАПУСК МОНИТОРА
 # =========================================================
 
+
 def main():
-        import threading
+
+    import threading
 
     telegram_thread = threading.Thread(
         target=poll_telegram,
