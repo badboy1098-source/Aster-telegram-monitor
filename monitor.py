@@ -312,12 +312,35 @@ def get_pre_signal(symbol):
             1 for change in last_15
             if change < 0
         )
+# =========================
+# СНАЧАЛА ПРОВЕРЯЕМ ДВИЖЕНИЕ
+# =========================
 
-        # =========================
-        # СТАКАН
-        # =========================
+if not (
+    (
+        hour_change > 0.5
+        and last_15_change > 0.5
+        and acceleration_up
+        and volume_rising
+        and green_count >= 9
+    )
+    or
+    (
+        hour_change < -0.5
+        and last_15_change < -0.5
+        and acceleration_down
+        and volume_rising
+        and red_count >= 9
+    )
+):
+    return None
 
-        buy_total, sell_total, best_bid, best_ask = get_order_book(symbol)
+
+# =========================
+# ТЕПЕРЬ ПРОВЕРЯЕМ СТАКАН
+# =========================
+
+buy_total, sell_total, best_bid, best_ask = get_order_book(symbol)
 
         # =========================
         # ПРЕДСИГНАЛ BUY
