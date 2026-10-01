@@ -129,35 +129,26 @@ last_alerts = {}
 
 def send_telegram(message):
 
-    if not TELEGRAM_TOKEN or not CHAT_ID:
-        print("❌ TELEGRAM_TOKEN или CHAT_ID не найдены")
-        return
+    subscribers = get_subscribers()
 
-    url = (
-        f"https://api.telegram.org/bot"
-        f"{TELEGRAM_TOKEN}/sendMessage"
-    )
+    # Если подписчиков пока нет —
+    # используем старый CHAT_ID как запасной вариант
+    if not subscribers and CHAT_ID:
+        subscribers = [CHAT_ID]
 
-    data = {
-        "chat_id": CHAT_ID,
-        "text": message
-    }
-
-    try:
-
-        response = requests.post(
-            url,
-            data=data,
-            timeout=10
-        )
-
-        response.raise_for_status()
-
-    except Exception as e:
+    if not subscribers:
 
         print(
-            "❌ Ошибка Telegram:",
-            e
+            "❌ Подписчиков пока нет"
+        )
+
+        return
+
+    for chat_id in subscribers:
+
+        send_telegram_to_chat(
+            chat_id,
+            message
         )
 
 
