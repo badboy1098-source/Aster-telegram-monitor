@@ -995,6 +995,14 @@ def scan():
 # =========================================================
 
 def main():
+        import threading
+
+    telegram_thread = threading.Thread(
+        target=poll_telegram,
+        daemon=True
+    )
+
+    telegram_thread.start()
 
     print(
         "🚀 Aster Monitor запущен"
