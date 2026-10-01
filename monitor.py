@@ -700,6 +700,7 @@ def scan():
         return
 
     results = []
+        pre_results = []
 
     # Проверяем монеты параллельно,
     # чтобы не ждать каждую по очереди
@@ -725,6 +726,23 @@ def scan():
 
                 if result:
                     results.append(result)
+                                    # =========================
+                # 🔎 ОТДЕЛЬНЫЙ ПРЕДСИГНАЛ
+                # =========================
+
+                try:
+
+                    pre_result = get_pre_signal(symbol)
+
+                    if pre_result:
+                        pre_results.append(pre_result)
+
+                except Exception as e:
+
+                    print(
+                        f"Ошибка предсигнала {symbol}:",
+                        e
+                    )
 
             except Exception as e:
 
