@@ -423,7 +423,7 @@ def get_pre_signal(symbol):
         # СТАКАН
         # =========================
 
-        buy_total, sell_total = get_order_book(symbol)
+        buy_total, sell_total, best_bid, best_ask = get_order_book(symbol)
 
         # =========================
         # ПРЕДСИГНАЛ BUY
