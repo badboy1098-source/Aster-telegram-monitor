@@ -16,11 +16,11 @@ def get_subscribers():
         print("❌ SUPABASE настройки не найдены")
         return []
 
-    url = (
-        f"{SUPABASE_URL}"
-        f"/rest/v1/subscribers"
-        f"?select=chat_id"
-    )
+url = (
+    f"{SUPABASE_URL}"
+    f"/rest/v1/subscribers"
+    f"?select=chat_id&approved=eq.true"
+)
 
     headers = {
         "apikey": SUPABASE_SECRET,
