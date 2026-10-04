@@ -493,3 +493,93 @@ def test_pro_engine():
     print(
         "✅ ASTER PRO ENGINE работает"
     )
+# =========================================================
+# ASTER PRO — АНАЛИЗ СТАКАНА
+# =========================================================
+
+def get_pro_order_book(symbol):
+
+    try:
+
+        url = f"{ASTER_BASE}/fapi/v1/depth"
+
+        params = {
+            "symbol": symbol,
+            "limit": 100
+        }
+
+        response = requests.get(
+            url,
+            params=params,
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        data = response.json()
+
+        bids = data.get("bids", [])
+        asks = data.get("asks", [])
+
+        buy_total = 0
+        sell_total = 0
+
+        for price, quantity in bids:
+
+            buy_total += (
+                float(price)
+                * float(quantity)
+            )
+
+        for price, quantity in asks:
+
+            sell_total += (
+                float(price)
+                * float(quantity)
+            )
+
+        best_bid = (
+            float(bids[0][0])
+            if bids else None
+        )
+
+        best_ask = (
+            float(asks[0][0])
+            if asks else None
+        )
+
+        if not best_bid or not best_ask:
+            return None
+
+        spread = (
+            best_ask - best_bid
+        )
+
+        mid_price = (
+            best_bid + best_ask
+        ) / 2
+
+        imbalance = (
+            buy_total / sell_total
+            if sell_total > 0
+            else 999
+        )
+
+        return {
+            "buy_total": buy_total,
+            "sell_total": sell_total,
+            "best_bid": best_bid,
+            "best_ask": best_ask,
+            "spread": spread,
+            "mid_price": mid_price,
+            "imbalance": imbalance
+        }
+
+    except Exception as e:
+
+        print(
+            f"❌ ASTER PRO стакан {symbol}:",
+            e
+        )
+
+        return None
