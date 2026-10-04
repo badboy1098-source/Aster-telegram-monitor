@@ -1094,3 +1094,302 @@ def calculate_trade_levels(
         "rr_tp2": rr_tp2,
         "rr_tp3": rr_tp3
     }
+
+# =========================================================
+# ASTER PRO — ПОЛНЫЙ АНАЛИЗ МОНЕТЫ
+# =========================================================
+
+def analyze_pro_symbol(symbol):
+
+    timeframes = get_pro_timeframes(symbol)
+
+    if not timeframes:
+        return None
+
+    candles_1h = timeframes.get("1h")
+    candles_15m = timeframes.get("15m")
+    candles_5m = timeframes.get("5m")
+    candles_1m = timeframes.get("1m")
+
+    if not candles_1h:
+        return None
+
+    if not candles_15m:
+        return None
+
+    if not candles_5m:
+        return None
+
+    if not candles_1m:
+        return None
+
+    # =====================================================
+    # 1H — ГЛАВНЫЙ ТРЕНД
+    # =====================================================
+
+    closes_1h = [
+        c["close"]
+        for c in candles_1h
+    ]
+
+    ema20_1h = calculate_ema(
+        closes_1h,
+        20
+    )
+
+    ema50_1h = calculate_ema(
+        closes_1h,
+        50
+    )
+
+    ema200_1h = calculate_ema(
+        closes_1h,
+        200
+    )
+
+    if (
+        ema20_1h is None
+        or ema50_1h is None
+        or ema200_1h is None
+    ):
+        return None
+
+    price_1h = closes_1h[-1]
+
+    if (
+        price_1h > ema20_1h
+        and ema20_1h > ema50_1h
+        and ema50_1h > ema200_1h
+    ):
+
+        trend_1h = "BULLISH"
+
+    elif (
+        price_1h < ema20_1h
+        and ema20_1h < ema50_1h
+        and ema50_1h < ema200_1h
+    ):
+
+        trend_1h = "BEARISH"
+
+    else:
+
+        trend_1h = "RANGE"
+
+    # =====================================================
+    # 15M — СТРУКТУРА
+    # =====================================================
+
+    structure_data = analyze_market_structure(
+        candles_15m
+    )
+
+    if not structure_data:
+        return None
+
+    structure_15m = structure_data["trend"]
+
+    # =====================================================
+    # 5M — MOMENTUM
+    # =====================================================
+
+    momentum_data = analyze_volume_momentum(
+        candles_5m
+    )
+
+    if not momentum_data:
+        return None
+
+    momentum_5m = momentum_data["momentum"]
+
+    # =====================================================
+    # 5M — RSI
+    # =====================================================
+
+    closes_5m = [
+        c["close"]
+        for c in candles_5m
+    ]
+
+    rsi_5m = calculate_rsi(
+        closes_5m
+    )
+
+    # =====================================================
+    # 5M — MACD
+    # =====================================================
+
+    macd_5m = calculate_macd(
+        closes_5m
+    )
+
+    # =====================================================
+    # 5M — ATR
+    # =====================================================
+
+    atr_5m = calculate_atr(
+        candles_5m
+    )
+
+    if atr_5m is None:
+        return None
+
+    # =====================================================
+    # СТАКАН
+    # =====================================================
+
+    order_book = get_pro_order_book(
+        symbol
+    )
+
+    if order_book is None:
+        return None
+
+    # =====================================================
+    # НАПРАВЛЕНИЕ
+    # =====================================================
+
+    long_conditions = 0
+    short_conditions = 0
+
+    if trend_1h == "BULLISH":
+        long_conditions += 1
+
+    if trend_1h == "BEARISH":
+        short_conditions += 1
+
+    if structure_15m == "BULLISH":
+        long_conditions += 1
+
+    if structure_15m == "BEARISH":
+        short_conditions += 1
+
+    if momentum_5m == "BULLISH":
+        long_conditions += 1
+
+    if momentum_5m == "BEARISH":
+        short_conditions += 1
+
+    if (
+        rsi_5m is not None
+        and 50 <= rsi_5m <= 70
+    ):
+        long_conditions += 1
+
+    if (
+        rsi_5m is not None
+        and 30 <= rsi_5m < 50
+    ):
+        short_conditions += 1
+
+    if macd_5m[0] is not None:
+
+        macd, signal, histogram = macd_5m
+
+        if (
+            macd > signal
+            and histogram > 0
+        ):
+            long_conditions += 1
+
+        if (
+            macd < signal
+            and histogram < 0
+        ):
+            short_conditions += 1
+
+    imbalance = order_book.get(
+        "imbalance",
+        0
+    )
+
+    if imbalance >= 1.5:
+        long_conditions += 1
+
+    if (
+        imbalance > 0
+        and imbalance <= 0.67
+    ):
+        short_conditions += 1
+
+    # =====================================================
+    # ОПРЕДЕЛЯЕМ НАПРАВЛЕНИЕ
+    # =====================================================
+
+    if long_conditions >= 4 and (
+        long_conditions > short_conditions
+    ):
+
+        direction = "LONG"
+
+    elif short_conditions >= 4 and (
+        short_conditions > long_conditions
+    ):
+
+        direction = "SHORT"
+
+    else:
+
+        direction = None
+
+    if direction is None:
+        return None
+
+    # =====================================================
+    # SCORE
+    # =====================================================
+
+    score_data = calculate_pro_score(
+        trend_1h,
+        structure_15m,
+        momentum_5m,
+        rsi_5m,
+        macd_5m,
+        order_book
+    )
+
+    # =====================================================
+    # ENTRY / SL / TP
+    # =====================================================
+
+    trade_levels = calculate_trade_levels(
+        candles_5m,
+        direction,
+        atr_5m
+    )
+
+    if not trade_levels:
+        return None
+
+    return {
+        "symbol": symbol,
+        "direction": direction,
+
+        "score": score_data["score"],
+        "grade": score_data["grade"],
+        "reasons": score_data["reasons"],
+
+        "trend_1h": trend_1h,
+        "structure_15m": structure_15m,
+        "momentum_5m": momentum_5m,
+
+        "rsi_5m": rsi_5m,
+        "macd_5m": macd_5m,
+        "atr_5m": atr_5m,
+
+        "order_book": order_book,
+
+        "entry": trade_levels["entry"],
+        "stop_loss": trade_levels["stop_loss"],
+        "tp1": trade_levels["tp1"],
+        "tp2": trade_levels["tp2"],
+        "tp3": trade_levels["tp3"],
+
+        "risk_percent": trade_levels[
+            "risk_percent"
+        ],
+
+        "rr_tp1": trade_levels["rr_tp1"],
+        "rr_tp2": trade_levels["rr_tp2"],
+        "rr_tp3": trade_levels["rr_tp3"]
+    }
