@@ -703,3 +703,108 @@ def analyze_market_structure(candles, lookback=30):
         "lower_high": lower_high,
         "lower_low": lower_low
     }
+
+# =========================================================
+# ASTER PRO — ОБЪЁМ И ИМПУЛЬС
+# =========================================================
+
+def analyze_volume_momentum(
+    candles,
+    volume_period=20
+):
+
+    if len(candles) < volume_period + 5:
+        return None
+
+    current = candles[-1]
+
+    previous = candles[-2]
+
+    average_vol = average_volume(
+        candles[:-1],
+        volume_period
+    )
+
+    if average_vol is None or average_vol == 0:
+        return None
+
+    current_volume = current["volume"]
+
+    volume_ratio = (
+        current_volume / average_vol
+    )
+
+    price_change = (
+        (
+            current["close"]
+            - previous["close"]
+        )
+        / previous["close"]
+    ) * 100
+
+    candle_range = (
+        current["high"]
+        - current["low"]
+    )
+
+    if candle_range <= 0:
+        candle_strength = 0
+    else:
+        candle_strength = (
+            abs(
+                current["close"]
+                - current["open"]
+            )
+            / candle_range
+        )
+
+    bullish = (
+        current["close"]
+        > current["open"]
+    )
+
+    bearish = (
+        current["close"]
+        < current["open"]
+    )
+
+    strong_volume = (
+        volume_ratio >= 1.5
+    )
+
+    strong_bullish = (
+        bullish
+        and strong_volume
+        and price_change > 0
+        and candle_strength >= 0.5
+    )
+
+    strong_bearish = (
+        bearish
+        and strong_volume
+        and price_change < 0
+        and candle_strength >= 0.5
+    )
+
+    if strong_bullish:
+
+        momentum = "BULLISH"
+
+    elif strong_bearish:
+
+        momentum = "BEARISH"
+
+    else:
+
+        momentum = "NEUTRAL"
+
+    return {
+        "current_volume": current_volume,
+        "average_volume": average_vol,
+        "volume_ratio": volume_ratio,
+        "price_change": price_change,
+        "candle_strength": candle_strength,
+        "momentum": momentum,
+        "strong_volume": strong_volume
+    }
+    
