@@ -822,113 +822,6 @@ def calculate_pro_score(
     momentum_5m,
     rsi_5m,
     macd_5m,
-    order_book
-):
-
-    score = 0
-    reasons = []
-
-    # -----------------------------------------------------
-    # 1. ТРЕНД 1H — максимум 25 баллов
-    # -----------------------------------------------------
-
-    if trend_1h == "BULLISH":
-
-        score += 25
-        reasons.append("🟢 1H BULLISH")
-
-    elif trend_1h == "BEARISH":
-
-        score += 25
-        reasons.append("🔴 1H BEARISH")
-
-    # -----------------------------------------------------
-    # 2. СТРУКТУРА 15M — максимум 15 баллов
-    # -----------------------------------------------------
-
-    if structure_15m == "BULLISH":
-
-        score += 15
-        reasons.append("🟢 15M структура BULLISH")
-
-    elif structure_15m == "BEARISH":
-
-        score += 15
-        reasons.append("🔴 15M структура BEARISH")
-
-    # -----------------------------------------------------
-    # 3. MOMENTUM 5M — максимум 15 баллов
-    # -----------------------------------------------------
-
-    if momentum_5m == "BULLISH":
-
-        score += 15
-        reasons.append("🟢 5M импульс BULLISH")
-
-    elif momentum_5m == "BEARISH":
-
-        score += 15
-        reasons.append("🔴 5M импульс BEARISH")
-
-    # -----------------------------------------------------
-    # 4. RSI — максимум 15 баллов
-    # -----------------------------------------------------
-
-    if rsi_5m is not None:
-
-        if 50 <= rsi_5m <= 70:
-
-            score += 15
-            reasons.append("📊 RSI подтверждает рост")
-
-        elif 30 <= rsi_5m < 50:
-
-            score += 15
-            reasons.append("📊 RSI подтверждает снижение")
-
-    # -----------------------------------------------------
-    # 5. MACD — максимум 15 баллов
-    # -----------------------------------------------------
-
-    if macd_5m is not None:
-
-        macd, signal, histogram = macd_5m
-
-        if (
-            macd > signal
-            and histogram > 0
-        ):
-
-            score += 15
-            reasons.append("📈 MACD BULLISH")
-
-        elif (
-            macd < signal
-            and histogram < 0
-        ):
-
-            score += 15
-            reasons.append("📉 MACD BEARISH")
-
-    # -----------------------------------------------------
-    # 6. СТАКАН — максимум 15 баллов
-    # -----------------------------------------------------
-
-    if order_book is not None:
-
-        imbalance = order_book.get(
-            "imbalance",
-            0
-        )
-
-        if imbalance >= 1.5:
-
-def calculate_pro_score(
-    trend_1h,
-    structure_15m,
-    momentum_5m,
-    rsi_5m,
-    macd_5m,
     order_book,
     direction
 ):
@@ -936,189 +829,49 @@ def calculate_pro_score(
     score = 0
     reasons = []
 
-    # ==============================
-    # 1H TREND — 25 баллов
-    # ==============================
-
-    if trend_1h == direction:
-
-        score += 25
-
-        reasons.append(
-            f"1H тренд: {trend_1h}"
-        )
-
-    # ==============================
-    # 15M STRUCTURE — 15 баллов
-    # ==============================
-
-    if structure_15m == direction:
-
-        score += 15
-
-        reasons.append(
-            f"15M структура: {structure_15m}"
-        )
-
-    # ==============================
-    # 5M MOMENTUM — 15 баллов
-    # ==============================
-
-    if momentum_5m == direction:
-
-        score += 15
-
-        reasons.append(
-            f"5M импульс: {momentum_5m}"
-        )
-
-    # ==============================
-    # RSI — 15 баллов
-    # ==============================
-
-    if direction == "LONG":
-
-        if rsi_5m is not None and 50 <= rsi_5m <= 70:
-
-            score += 15
-
-            reasons.append(
-                f"RSI подтверждает LONG: {rsi_5m:.1f}"
-            )
-
-    elif direction == "SHORT":
-
-        if rsi_5m is not None and 30 <= rsi_5m < 50:
-
-            score += 15
-
-            reasons.append(
-                f"RSI подтверждает SHORT: {rsi_5m:.1f}"
-            )
-
-    # ==============================
-    # MACD — 15 баллов
-    # ==============================
-
-    macd, signal, histogram = macd_5m
-
-    if macd is not None and signal is not None:
-
-        if direction == "LONG" and macd > signal:
-
-            score += 15
-
-            reasons.append(
-                "MACD подтверждает LONG"
-            )
-
-        elif direction == "SHORT" and macd < signal:
-
-            score += 15
-
-            reasons.append(
-                "MACD подтверждает SHORT"
-            )
-
-    # ==============================
-    # ORDER BOOK — 15 баллов
-    # ==============================
-
-    imbalance = order_book.get(
-        "imbalance",
-        0
-    )
-
-    if direction == "LONG" and imbalance >= 1.5:
-
-    def calculate_pro_score(
-    trend_1h,
-    structure_15m,
-    momentum_5m,
-    rsi_5m,
-    macd_5m,
-    order_book,
-    direction
-):
-
-    score = 0
-    reasons = []
-
-    # Направление сделки
     target_trend = (
         "BULLISH"
         if direction == "LONG"
         else "BEARISH"
     )
 
-    # ==============================
     # 1H TREND — 25 баллов
-    # ==============================
-
     if trend_1h == target_trend:
-
         score += 25
-
         reasons.append(
             f"1H тренд: {trend_1h}"
         )
 
-    # ==============================
     # 15M STRUCTURE — 15 баллов
-    # ==============================
-
     if structure_15m == target_trend:
-
         score += 15
-
         reasons.append(
             f"15M структура: {structure_15m}"
         )
 
-    # ==============================
     # 5M MOMENTUM — 15 баллов
-    # ==============================
-
     if momentum_5m == target_trend:
-
         score += 15
-
         reasons.append(
             f"5M импульс: {momentum_5m}"
         )
 
-    # ==============================
     # RSI — 15 баллов
-    # ==============================
-
     if rsi_5m is not None:
 
-        if (
-            direction == "LONG"
-            and 50 <= rsi_5m <= 70
-        ):
-
+        if direction == "LONG" and 50 <= rsi_5m <= 70:
             score += 15
-
             reasons.append(
-                f"RSI LONG: {rsi_5m:.1f}"
+                f"RSI подтверждает LONG: {rsi_5m:.1f}"
             )
 
-        elif (
-            direction == "SHORT"
-            and 30 <= rsi_5m < 50
-        ):
-
+        elif direction == "SHORT" and 30 <= rsi_5m < 50:
             score += 15
-
             reasons.append(
-                f"RSI SHORT: {rsi_5m:.1f}"
+                f"RSI подтверждает SHORT: {rsi_5m:.1f}"
             )
 
-    # ==============================
     # MACD — 15 баллов
-    # ==============================
-
     if macd_5m is not None:
 
         macd, signal, histogram = macd_5m
@@ -1130,11 +883,9 @@ def calculate_pro_score(
             and macd > signal
             and histogram > 0
         ):
-
             score += 15
-
             reasons.append(
-                "MACD LONG"
+                "MACD подтверждает LONG"
             )
 
         elif (
@@ -1144,17 +895,12 @@ def calculate_pro_score(
             and macd < signal
             and histogram < 0
         ):
-
             score += 15
-
             reasons.append(
-                "MACD SHORT"
+                "MACD подтверждает SHORT"
             )
 
-    # ==============================
     # ORDER BOOK — 15 баллов
-    # ==============================
-
     if order_book is not None:
 
         imbalance = order_book.get(
@@ -1162,46 +908,29 @@ def calculate_pro_score(
             0
         )
 
-        if (
-            direction == "LONG"
-            and imbalance >= 1.5
-        ):
-
+        if direction == "LONG" and imbalance >= 1.5:
             score += 15
-
             reasons.append(
-                f"Стакан LONG: {imbalance:.2f}"
+                f"Стакан подтверждает LONG: {imbalance:.2f}"
             )
 
-        elif (
-            direction == "SHORT"
-            and imbalance <= 0.67
-        ):
-
+        elif direction == "SHORT" and imbalance <= 0.67:
             score += 15
-
             reasons.append(
-                f"Стакан SHORT: {imbalance:.2f}"
+                f"Стакан подтверждает SHORT: {imbalance:.2f}"
             )
 
-    # ==============================
     # GRADE
-    # ==============================
-
     if score >= 85:
-
         grade = "VERY STRONG"
 
     elif score >= 75:
-
         grade = "STRONG"
 
     elif score >= 65:
-
         grade = "MODERATE"
 
     else:
-
         grade = "WEAK"
 
     return score, grade, reasons
@@ -1581,13 +1310,14 @@ def analyze_pro_symbol(symbol):
     # SCORE
     # =====================================================
 
-    score_data = calculate_pro_score(
-        trend_1h,
-        structure_15m,
-        momentum_5m,
-        rsi_5m,
-        macd_5m,
-        order_book
+    score, grade, reasons = calculate_pro_score(
+    trend_1h,
+    structure_15m,
+    momentum_5m,
+    rsi_5m,
+    macd_5m,
+    order_book,
+    direction
     )
 
     # =====================================================
@@ -1607,9 +1337,9 @@ def analyze_pro_symbol(symbol):
         "symbol": symbol,
         "direction": direction,
 
-        "score": score_data["score"],
-        "grade": score_data["grade"],
-        "reasons": score_data["reasons"],
+        "score": score,
+        "grade": grade,
+        "reasons": reasons,
 
         "trend_1h": trend_1h,
         "structure_15m": structure_15m,
