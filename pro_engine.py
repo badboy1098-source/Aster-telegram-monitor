@@ -808,3 +808,154 @@ def analyze_volume_momentum(
         "strong_volume": strong_volume
     }
     
+# =========================================================
+# ASTER PRO — SCORE 0-100
+# =========================================================
+
+def calculate_pro_score(
+    trend_1h,
+    structure_15m,
+    momentum_5m,
+    rsi_5m,
+    macd_5m,
+    order_book
+):
+
+    score = 0
+    reasons = []
+
+    # -----------------------------------------------------
+    # 1. ТРЕНД 1H — максимум 25 баллов
+    # -----------------------------------------------------
+
+    if trend_1h == "BULLISH":
+
+        score += 25
+        reasons.append("🟢 1H BULLISH")
+
+    elif trend_1h == "BEARISH":
+
+        score += 25
+        reasons.append("🔴 1H BEARISH")
+
+    # -----------------------------------------------------
+    # 2. СТРУКТУРА 15M — максимум 15 баллов
+    # -----------------------------------------------------
+
+    if structure_15m == "BULLISH":
+
+        score += 15
+        reasons.append("🟢 15M структура BULLISH")
+
+    elif structure_15m == "BEARISH":
+
+        score += 15
+        reasons.append("🔴 15M структура BEARISH")
+
+    # -----------------------------------------------------
+    # 3. MOMENTUM 5M — максимум 15 баллов
+    # -----------------------------------------------------
+
+    if momentum_5m == "BULLISH":
+
+        score += 15
+        reasons.append("🟢 5M импульс BULLISH")
+
+    elif momentum_5m == "BEARISH":
+
+        score += 15
+        reasons.append("🔴 5M импульс BEARISH")
+
+    # -----------------------------------------------------
+    # 4. RSI — максимум 15 баллов
+    # -----------------------------------------------------
+
+    if rsi_5m is not None:
+
+        if 50 <= rsi_5m <= 70:
+
+            score += 15
+            reasons.append("📊 RSI подтверждает рост")
+
+        elif 30 <= rsi_5m < 50:
+
+            score += 15
+            reasons.append("📊 RSI подтверждает снижение")
+
+    # -----------------------------------------------------
+    # 5. MACD — максимум 15 баллов
+    # -----------------------------------------------------
+
+    if macd_5m is not None:
+
+        macd, signal, histogram = macd_5m
+
+        if (
+            macd > signal
+            and histogram > 0
+        ):
+
+            score += 15
+            reasons.append("📈 MACD BULLISH")
+
+        elif (
+            macd < signal
+            and histogram < 0
+        ):
+
+            score += 15
+            reasons.append("📉 MACD BEARISH")
+
+    # -----------------------------------------------------
+    # 6. СТАКАН — максимум 15 баллов
+    # -----------------------------------------------------
+
+    if order_book is not None:
+
+        imbalance = order_book.get(
+            "imbalance",
+            0
+        )
+
+        if imbalance >= 1.5:
+
+            score += 15
+            reasons.append(
+                "🟢 Стакан перевешивает BUY"
+            )
+
+        elif (
+            imbalance > 0
+            and imbalance <= 0.67
+        ):
+
+            score += 15
+            reasons.append(
+                "🔴 Стакан перевешивает SELL"
+            )
+
+    # -----------------------------------------------------
+    # Итог
+    # -----------------------------------------------------
+
+    if score >= 85:
+
+        grade = "🔥 VERY STRONG"
+
+    elif score >= 75:
+
+        grade = "🟢 STRONG"
+
+    elif score >= 65:
+
+        grade = "🟡 MODERATE"
+
+    else:
+
+        grade = "⚪ WEAK"
+
+    return {
+        "score": score,
+        "grade": grade,
+        "reasons": reasons
+    }
