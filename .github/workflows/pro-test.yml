@@ -1,12 +1,18 @@
-name: ASTER PRO Test
+name: ASTER PRO
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'
+
+concurrency:
+  group: aster-pro
+  cancel-in-progress: false
 
 jobs:
-  pro-test:
+  pro:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 350
 
     steps:
       - name: Скачать код
