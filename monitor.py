@@ -911,6 +911,10 @@ def poll_telegram():
                     message.get("text") or ""
                 ).strip()
 
+                first_name = chat.get("first_name", "")
+                last_name = chat.get("last_name", "")
+                username = chat.get("username", "")
+
                 if not chat_id:
                     continue
 
@@ -982,12 +986,26 @@ def poll_telegram():
                         # =====================================
                         # УВЕДОМЛЕНИЕ АДМИНИСТРАТОРУ
                         # =====================================
-
                         if CHAT_ID:
+
+                            username_text = (
+                                f"@{username}"
+                                if username
+                                else "нет"
+                            )
 
                             admin_message = (
                                 "🔔 НОВАЯ ЗАЯВКА\n\n"
-                                f"🆔 Chat ID: {chat_id}\n\n"
+
+                                f"👤 Имя: "
+                                f"{first_name} {last_name}\n"
+
+                                f"🔗 Username: "
+                                f"{username_text}\n"
+
+                                f"🆔 Chat ID: "
+                                f"{chat_id}\n\n"
+
                                 "Новый пользователь хочет получить "
                                 "доступ к сигналам Aster DEX."
                             )
