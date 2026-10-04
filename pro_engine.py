@@ -923,51 +923,152 @@ def calculate_pro_score(
 
         if imbalance >= 1.5:
 
+def calculate_pro_score(
+    trend_1h,
+    structure_15m,
+    momentum_5m,
+    rsi_5m,
+    macd_5m,
+    order_book,
+    direction
+):
+
+    score = 0
+    reasons = []
+
+    # ==============================
+    # 1H TREND — 25 баллов
+    # ==============================
+
+    if trend_1h == direction:
+
+        score += 25
+
+        reasons.append(
+            f"1H тренд: {trend_1h}"
+        )
+
+    # ==============================
+    # 15M STRUCTURE — 15 баллов
+    # ==============================
+
+    if structure_15m == direction:
+
+        score += 15
+
+        reasons.append(
+            f"15M структура: {structure_15m}"
+        )
+
+    # ==============================
+    # 5M MOMENTUM — 15 баллов
+    # ==============================
+
+    if momentum_5m == direction:
+
+        score += 15
+
+        reasons.append(
+            f"5M импульс: {momentum_5m}"
+        )
+
+    # ==============================
+    # RSI — 15 баллов
+    # ==============================
+
+    if direction == "LONG":
+
+        if rsi_5m is not None and 50 <= rsi_5m <= 70:
+
             score += 15
+
             reasons.append(
-                "🟢 Стакан перевешивает BUY"
+                f"RSI подтверждает LONG: {rsi_5m:.1f}"
             )
 
-        elif (
-            imbalance > 0
-            and imbalance <= 0.67
-        ):
+    elif direction == "SHORT":
+
+        if rsi_5m is not None and 30 <= rsi_5m < 50:
 
             score += 15
+
             reasons.append(
-                "🔴 Стакан перевешивает SELL"
+                f"RSI подтверждает SHORT: {rsi_5m:.1f}"
             )
 
-    # -----------------------------------------------------
-    # Итог
-    # -----------------------------------------------------
+    # ==============================
+    # MACD — 15 баллов
+    # ==============================
+
+    macd, signal, histogram = macd_5m
+
+    if macd is not None and signal is not None:
+
+        if direction == "LONG" and macd > signal:
+
+            score += 15
+
+            reasons.append(
+                "MACD подтверждает LONG"
+            )
+
+        elif direction == "SHORT" and macd < signal:
+
+            score += 15
+
+            reasons.append(
+                "MACD подтверждает SHORT"
+            )
+
+    # ==============================
+    # ORDER BOOK — 15 баллов
+    # ==============================
+
+    imbalance = order_book.get(
+        "imbalance",
+        0
+    )
+
+    if direction == "LONG" and imbalance >= 1.5:
+
+        score += 15
+
+        reasons.append(
+            f"Стакан подтверждает LONG: "
+            f"{imbalance:.2f}"
+        )
+
+    elif direction == "SHORT" and imbalance <= 0.67:
+
+        score += 15
+
+        reasons.append(
+            f"Стакан подтверждает SHORT: "
+            f"{imbalance:.2f}"
+        )
+
+    # ==============================
+    # GRADE
+    # ==============================
 
     if score >= 85:
 
-        grade = "🔥 VERY STRONG"
+        grade = "VERY STRONG"
 
     elif score >= 75:
 
-        grade = "🟢 STRONG"
+        grade = "STRONG"
 
     elif score >= 65:
 
-        grade = "🟡 MODERATE"
+        grade = "MODERATE"
 
     else:
 
-        grade = "⚪ WEAK"
+        grade = "WEAK"
 
-    return {
-        "score": score,
-        "grade": grade,
-        "reasons": reasons
-    }
+    return score, grade, reasons
     
-# =========================================================
-# ASTER PRO — ENTRY / STOP LOSS / TAKE PROFIT
-# =========================================================
-
 def calculate_trade_levels(
     candles,
     direction,
