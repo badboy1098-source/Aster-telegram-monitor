@@ -2364,4 +2364,22 @@ def test_pro_telegram():
 
 
 if __name__ == "__main__":
-    run_pro_scan()
+
+    print("🧠 ASTER PRO ЗАПУЩЕН")
+    print("⏱ Интервал сканирования: 5 минут")
+    print("🚫 BTCUSDT и ETHUSDT исключены")
+    print("⚠️ Автоматические сделки НЕ открываются")
+
+    while True:
+
+        try:
+
+            run_pro_scan()
+
+        except Exception as e:
+
+            print("❌ Ошибка ASTER PRO:", e)
+
+        print("⏳ Следующий PRO скан через 5 минут...")
+
+        time.sleep(300)
