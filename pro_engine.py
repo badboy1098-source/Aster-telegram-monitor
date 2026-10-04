@@ -2167,7 +2167,8 @@ def get_pro_subscribers():
 
     url = (
         f"{SUPABASE_URL}"
-        f"/rest/v1/subscribers?select=chat_id"
+        f"/rest/v1/subscribers?select=chat_id,approved"
+        f"&approved=eq.true"
     )
 
     headers = {
@@ -2189,17 +2190,26 @@ def get_pro_subscribers():
 
         data = response.json()
 
-        return [
+        subscribers = [
             str(item["chat_id"])
             for item in data
             if item.get("chat_id")
+            and item.get("approved") is True
         ]
+
+        print(
+            f"✅ ASTER PRO: "
+            f"одобренных пользователей: "
+            f"{len(subscribers)}"
+        )
+
+        return subscribers
 
     except Exception as e:
 
         print(
             "❌ ASTER PRO: "
-            "ошибка получения подписчиков:",
+            "ошибка получения одобренных подписчиков:",
             e
         )
 
