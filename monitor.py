@@ -856,6 +856,143 @@ def send_telegram_to_chat(
             e
         )
 
+# =========================================================
+# TELEGRAM — ОБРАБОТКА КНОПОК ОДОБРИТЬ / ОТКЛОНИТЬ
+# =========================================================
+
+def handle_callback(callback_query):
+
+    if not callback_query:
+        return
+
+    callback_id = callback_query.get("id")
+
+    data = callback_query.get("data", "")
+
+    from_user = callback_query.get(
+        "from",
+        {}
+    )
+
+    admin_id = str(
+        from_user.get("id")
+    )
+
+    # Только администратор может нажимать кнопки
+    if not CHAT_ID or admin_id != str(CHAT_ID):
+
+        return
+
+    if ":" not in data:
+
+        return
+
+    action, user_chat_id = data.split(
+        ":",
+        1
+    )
+
+    # =====================================================
+    # ОДОБРИТЬ
+    # =====================================================
+
+    if action == "approve":
+
+        url = (
+            f"{SUPABASE_URL}"
+            f"/rest/v1/subscribers"
+            f"?chat_id=eq.{user_chat_id}"
+        )
+
+        headers = {
+            "apikey": SUPABASE_SECRET,
+            "Authorization": f"Bearer {SUPABASE_SECRET}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal"
+        }
+
+        try:
+
+            response = requests.patch(
+                url,
+                headers=headers,
+                json={
+                    "approved": True
+                },
+                timeout=10
+            )
+
+            response.raise_for_status()
+
+            send_telegram_to_chat(
+                user_chat_id,
+
+                "✅ Доступ одобрен!\n\n"
+
+                "🔥 Теперь вы будете получать "
+                "сигналы Aster DEX автоматически.\n\n"
+
+                "📊 Порог движения: ±3% за 1M\n"
+                "💰 Стакан: от $15,000"
+            )
+
+            print(
+                f"✅ Пользователь {user_chat_id} одобрен"
+            )
+
+        except Exception as e:
+
+            print(
+                "❌ Ошибка одобрения:",
+                e
+            )
+
+    # =====================================================
+    # ОТКЛОНИТЬ
+    # =====================================================
+
+    elif action == "reject":
+
+        send_telegram_to_chat(
+            user_chat_id,
+
+            "❌ Заявка отклонена.\n\n"
+
+            "Доступ к сигналам Aster DEX "
+            "пока не предоставлен."
+        )
+
+        print(
+            f"❌ Пользователь {user_chat_id} отклонён"
+        )
+
+    # =====================================================
+    # УБИРАЕМ ОЖИДАНИЕ НАЖАТИЯ КНОПКИ
+    # =====================================================
+
+    if callback_id:
+
+        answer_url = (
+            f"https://api.telegram.org/"
+            f"bot{TELEGRAM_TOKEN}/answerCallbackQuery"
+        )
+
+        try:
+
+            requests.post(
+                answer_url,
+                json={
+                    "callback_query_id": callback_id
+                },
+                timeout=10
+            )
+
+        except Exception as e:
+
+            print(
+                "❌ Ошибка callback:",
+                e
+            )
 
 def poll_telegram():
 
@@ -897,6 +1034,18 @@ def poll_telegram():
             for update in updates:
 
                 offset = update["update_id"] + 1
+
+                callback_query = update.get(
+                    "callback_query"
+                )
+
+                if callback_query:
+
+                    handle_callback(
+                        callback_query
+                    )
+
+                    continue
 
                 message = update.get(
                     "message"
