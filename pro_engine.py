@@ -1,3 +1,4 @@
+import os
 import requests
 import time
 
@@ -1991,3 +1992,7 @@ def run_pro_scan():
                 f"{symbol} {direction} "
                 f"отправлен"
             )
+
+if __name__ == "__main__":
+    test_pro_engine()
+            
