@@ -131,6 +131,98 @@ last_alerts = {}
 # =========================================================
 # TELEGRAM
 # =========================================================
+# =========================================================
+# TELEGRAM — ОБРАБОТКА КОМАНД
+# =========================================================
+
+telegram_offset = 0
+
+
+def check_telegram_commands():
+
+    global telegram_offset
+
+    if not TELEGRAM_TOKEN:
+        return
+
+    url = (
+        f"https://api.telegram.org/bot"
+        f"{TELEGRAM_TOKEN}/getUpdates"
+    )
+
+    params = {
+        "offset": telegram_offset + 1,
+        "timeout": 1
+    }
+
+    try:
+
+        response = requests.get(
+            url,
+            params=params,
+            timeout=5
+        )
+
+        response.raise_for_status()
+
+        data = response.json()
+
+        if not data.get("ok"):
+            return
+
+        for update in data.get("result", []):
+
+            telegram_offset = update["update_id"]
+
+            message = update.get("message")
+
+            if not message:
+                continue
+
+            chat = message.get("chat")
+
+            if not chat:
+                continue
+
+            chat_id = chat.get("id")
+
+            text = message.get("text", "")
+
+            if text == "/start":
+
+                add_subscriber(chat_id)
+
+                welcome = (
+                    "👋 Здравствуйте! "
+                    "Добро пожаловать в наш клуб!\n\n"
+
+                    "🤖 Ваш помощник по трейдингу — "
+                    "анализирует рынок, ликвидность и стакан, "
+                    "помогая находить интересные торговые ситуации.\n\n"
+
+                    "⚠️ Бот создан исключительно для "
+                    "информационных рекомендаций и "
+                    "не гарантирует прибыль.\n\n"
+
+                    "🧠 А последнее слово — как и в жизни — "
+                    "всегда за вами.\n\n"
+
+                    "━━━━━━━━━━━━━━\n\n"
+
+                    "⚡ Бот работает 24/7"
+                )
+
+                send_telegram_to_chat(
+                    chat_id,
+                    welcome
+                )
+
+    except Exception as e:
+
+        print(
+            "❌ Ошибка Telegram:",
+            e
+        )
 
 def send_telegram(message):
 
