@@ -815,6 +815,124 @@ def analyze_volume_momentum(
 # =========================================================
 # ASTER PRO — SCORE 0-100
 # =========================================================
+# =========================================================
+# ASTER PRO — ДОПОЛНИТЕЛЬНЫЕ ФИЛЬТРЫ
+# =========================================================
+
+def detect_support_resistance(candles, lookback=50):
+
+    if len(candles) < lookback:
+        return None, None
+
+    recent = candles[-lookback:]
+
+    highs = [c["high"] for c in recent]
+    lows = [c["low"] for c in recent]
+
+    resistance = max(highs)
+    support = min(lows)
+
+    return support, resistance
+
+
+def detect_volume_spike(candles, period=20, multiplier=1.8):
+
+    if len(candles) < period + 1:
+        return False, 0
+
+    volumes = [c["volume"] for c in candles[-period-1:-1]]
+
+    average_volume = sum(volumes) / len(volumes)
+
+    current_volume = candles[-1]["volume"]
+
+    if average_volume <= 0:
+        return False, 0
+
+    ratio = current_volume / average_volume
+
+    return ratio >= multiplier, ratio
+
+
+def detect_candle_pattern(candles):
+
+    if len(candles) < 2:
+        return "NONE"
+
+    current = candles[-1]
+    previous = candles[-2]
+
+    current_open = current["open"]
+    current_close = current["close"]
+    current_high = current["high"]
+    current_low = current["low"]
+
+    previous_open = previous["open"]
+    previous_close = previous["close"]
+
+    body = abs(current_close - current_open)
+    candle_range = current_high - current_low
+
+    if candle_range <= 0:
+        return "NONE"
+
+    upper_wick = current_high - max(current_open, current_close)
+    lower_wick = min(current_open, current_close) - current_low
+
+    # Bullish engulfing
+    if (
+        current_close > current_open
+        and previous_close < previous_open
+        and current_close >= previous_open
+        and current_open <= previous_close
+    ):
+        return "BULLISH_ENGULFING"
+
+    # Bearish engulfing
+    if (
+        current_close < current_open
+        and previous_close > previous_open
+        and current_open >= previous_close
+        and current_close <= previous_open
+    ):
+        return "BEARISH_ENGULFING"
+
+    # Bullish pin bar
+    if (
+        lower_wick > body * 2
+        and lower_wick > upper_wick * 1.5
+    ):
+        return "BULLISH_PIN"
+
+    # Bearish pin bar
+    if (
+        upper_wick > body * 2
+        and upper_wick > lower_wick * 1.5
+    ):
+        return "BEARISH_PIN"
+
+    return "NONE"
+
+
+def detect_breakout(candles, lookback=20):
+
+    if len(candles) < lookback + 2:
+        return "NONE"
+
+    previous = candles[-lookback-1:-1]
+
+    resistance = max(c["high"] for c in previous)
+    support = min(c["low"] for c in previous)
+
+    current = candles[-1]
+
+    if current["close"] > resistance:
+        return "BREAKOUT"
+
+    if current["close"] < support:
+        return "BREAKDOWN"
+
+    return "NONE"
 
 def calculate_pro_score(
     trend_1h,
@@ -1217,6 +1335,26 @@ def analyze_pro_symbol(symbol):
         return None
 
     # =====================================================
+    # ASTER PRO — ДОПОЛНИТЕЛЬНЫЕ ФИЛЬТРЫ
+    # =====================================================
+
+    support_5m, resistance_5m = detect_support_resistance(
+        candles_5m
+    )
+
+    volume_spike, volume_ratio = detect_volume_spike(
+        candles_5m
+    )
+
+    candle_pattern = detect_candle_pattern(
+        candles_5m
+    )
+
+    breakout = detect_breakout(
+        candles_5m
+    )
+
+    # =====================================================
     # НАПРАВЛЕНИЕ
     # =====================================================
 
@@ -1281,6 +1419,39 @@ def analyze_pro_symbol(symbol):
         imbalance > 0
         and imbalance <= 0.67
     ):
+        short_conditions += 1
+
+    # =====================================================
+    # ДОПОЛНИТЕЛЬНЫЕ УСЛОВИЯ PRO
+    # =====================================================
+
+    # Объём
+    if volume_spike:
+
+        if momentum_5m == "BULLISH":
+            long_conditions += 1
+
+        elif momentum_5m == "BEARISH":
+            short_conditions += 1
+
+    # Свечные паттерны
+    if candle_pattern in (
+        "BULLISH_ENGULFING",
+        "BULLISH_PIN"
+    ):
+        long_conditions += 1
+
+    if candle_pattern in (
+        "BEARISH_ENGULFING",
+        "BEARISH_PIN"
+    ):
+        short_conditions += 1
+
+    # Пробой
+    if breakout == "BREAKOUT":
+        long_conditions += 1
+
+    if breakout == "BREAKDOWN":
         short_conditions += 1
 
     # =====================================================
