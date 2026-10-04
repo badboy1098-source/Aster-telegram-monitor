@@ -1713,7 +1713,8 @@ def analyze_pro_symbol(symbol):
         "resistance_5m": resistance_5m,
 
         "support_distance": support_distance,
-        "resistance_distance": resistance_distance
+        "resistance_distance": resistance_distance,
+        
         "overextension": overextension,
         "overextension_percent": overextension_percent
     }
