@@ -1920,3 +1920,74 @@ def send_pro_telegram_message(
             )
 
     return success
+
+# =========================================================
+# ASTER PRO — ЗАПУСК ОДНОГО СКАНИРОВАНИЯ
+# =========================================================
+
+def run_pro_scan():
+
+    print("")
+    print("==============================")
+    print("🧠 ASTER PRO — НОВЫЙ СКАН")
+    print("==============================")
+
+    setups = scan_pro_market()
+
+    if not setups:
+
+        print(
+            "⚪ ASTER PRO: "
+            "сильных сетапов нет"
+        )
+
+        return
+
+    # Берём только лучшие сетапы
+    # чтобы не отправлять много сигналов
+
+    setups = setups[:3]
+
+    for analysis in setups:
+
+        symbol = analysis[
+            "symbol"
+        ]
+
+        direction = analysis[
+            "direction"
+        ]
+
+        if is_pro_cooldown_active(
+            symbol,
+            direction
+        ):
+
+            print(
+                f"⏳ ASTER PRO: "
+                f"{symbol} {direction} "
+                f"ещё на cooldown"
+            )
+
+            continue
+
+        message = format_pro_signal(
+            analysis
+        )
+
+        sent = send_pro_telegram_message(
+            message
+        )
+
+        if sent:
+
+            mark_pro_alert(
+                symbol,
+                direction
+            )
+
+            print(
+                f"📨 ASTER PRO: "
+                f"{symbol} {direction} "
+                f"отправлен"
+            )
