@@ -1986,4 +1986,4 @@ def test_pro_telegram():
 
 
 if __name__ == "__main__":
-    test_pro_telegram()
+    run_pro_scan()
