@@ -1510,3 +1510,110 @@ def is_valid_pro_setup(
         return False
 
     return True
+
+# =========================================================
+# ASTER PRO — СКАНЕР ВСЕХ МОНЕТ
+# =========================================================
+
+def scan_pro_market():
+
+    print("")
+    print("==============================")
+    print("🧠 ASTER PRO — СКАНИРОВАНИЕ")
+    print("==============================")
+
+    symbols = get_pro_symbols()
+
+    print(
+        f"🔎 Монет для PRO анализа: "
+        f"{len(symbols)}"
+    )
+
+    if not symbols:
+        print(
+            "⚪ Подходящих монет нет"
+        )
+        return []
+
+    setups = []
+
+    for symbol, volume in symbols:
+
+        try:
+
+            analysis = analyze_pro_symbol(
+                symbol
+            )
+
+            if not analysis:
+                continue
+
+            direction = analysis[
+                "direction"
+            ]
+
+            candles_1m = get_pro_klines(
+                symbol,
+                "1m",
+                50
+            )
+
+            candles_1m = prepare_candles(
+                candles_1m
+            )
+
+            if not candles_1m:
+                continue
+
+            entry_confirmation = (
+                confirm_1m_entry(
+                    candles_1m,
+                    direction
+                )
+            )
+
+            if not is_valid_pro_setup(
+                analysis,
+                entry_confirmation
+            ):
+                continue
+
+            analysis["volume_24h"] = volume
+
+            analysis[
+                "entry_confirmation"
+            ] = entry_confirmation
+
+            setups.append(
+                analysis
+            )
+
+            print(
+                f"🔥 PRO SETUP: "
+                f"{symbol} "
+                f"{direction} "
+                f"Score={analysis['score']}"
+            )
+
+        except Exception as e:
+
+            print(
+                f"❌ PRO {symbol}:",
+                e
+            )
+
+    # =====================================================
+    # СОРТИРОВКА ПО SCORE
+    # =====================================================
+
+    setups.sort(
+        key=lambda x: x["score"],
+        reverse=True
+    )
+
+    print(
+        f"✅ Найдено PRO сетапов: "
+        f"{len(setups)}"
+    )
+
+    return setups
