@@ -583,3 +583,41 @@ def get_pro_order_book(symbol):
         )
 
         return None
+        
+# =========================================================
+# ASTER PRO — МУЛЬТИТАЙМФРЕЙМ
+# =========================================================
+
+def get_pro_timeframes(symbol):
+
+    timeframes = {
+        "1h": 250,
+        "15m": 250,
+        "5m": 250,
+        "1m": 250
+    }
+
+    result = {}
+
+    for interval, limit in timeframes.items():
+
+        klines = get_pro_klines(
+            symbol,
+            interval,
+            limit
+        )
+
+        candles = prepare_candles(
+            klines
+        )
+
+        if not candles:
+            print(
+                f"⚠️ ASTER PRO {symbol}: "
+                f"нет данных {interval}"
+            )
+            continue
+
+        result[interval] = candles
+
+    return result
