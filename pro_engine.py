@@ -1393,3 +1393,120 @@ def analyze_pro_symbol(symbol):
         "rr_tp2": trade_levels["rr_tp2"],
         "rr_tp3": trade_levels["rr_tp3"]
     }
+
+# =========================================================
+# ASTER PRO — 1M ПОДТВЕРЖДЕНИЕ ВХОДА
+# =========================================================
+
+def confirm_1m_entry(
+    candles,
+    direction
+):
+
+    if len(candles) < 20:
+        return None
+
+    recent = candles[-5:]
+
+    green = 0
+    red = 0
+
+    for candle in recent:
+
+        if candle["close"] > candle["open"]:
+            green += 1
+
+        elif candle["close"] < candle["open"]:
+            red += 1
+
+    current = candles[-1]
+
+    candle_range = (
+        current["high"]
+        - current["low"]
+    )
+
+    if candle_range <= 0:
+        return False
+
+    body = abs(
+        current["close"]
+        - current["open"]
+    )
+
+    body_ratio = (
+        body / candle_range
+    )
+
+    if direction == "LONG":
+
+        confirmation = (
+            current["close"]
+            > current["open"]
+            and green >= 3
+            and body_ratio >= 0.45
+        )
+
+    elif direction == "SHORT":
+
+        confirmation = (
+            current["close"]
+            < current["open"]
+            and red >= 3
+            and body_ratio >= 0.45
+        )
+
+    else:
+
+        confirmation = False
+
+    return confirmation
+
+# =========================================================
+# ASTER PRO — ФИНАЛЬНЫЙ ФИЛЬТР
+# =========================================================
+
+def is_valid_pro_setup(
+    analysis,
+    entry_confirmation
+):
+
+    if not analysis:
+        return False
+
+    score = analysis.get(
+        "score",
+        0
+    )
+
+    direction = analysis.get(
+        "direction"
+    )
+
+    if direction not in (
+        "LONG",
+        "SHORT"
+    ):
+        return False
+
+    # Только сильные сетапы
+
+    if score < 75:
+        return False
+
+    # Обязательное подтверждение 1M
+
+    if not entry_confirmation:
+        return False
+
+    # Минимальный R/R до TP1
+
+    rr = analysis.get(
+        "rr_tp1",
+        0
+    )
+
+    if rr < 1.5:
+        return False
+
+    return True
