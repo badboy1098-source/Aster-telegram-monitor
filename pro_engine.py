@@ -621,3 +621,85 @@ def get_pro_timeframes(symbol):
         result[interval] = candles
 
     return result
+    
+# =========================================================
+# ASTER PRO — СТРУКТУРА РЫНКА
+# =========================================================
+
+def analyze_market_structure(candles, lookback=30):
+
+    if len(candles) < lookback:
+        return None
+
+    recent = candles[-lookback:]
+
+    highest = max(
+        c["high"]
+        for c in recent
+    )
+
+    lowest = min(
+        c["low"]
+        for c in recent
+    )
+
+    current_price = recent[-1]["close"]
+
+    previous_high = max(
+        c["high"]
+        for c in recent[:-5]
+    )
+
+    previous_low = min(
+        c["low"]
+        for c in recent[:-5]
+    )
+
+    higher_high = (
+        highest > previous_high
+    )
+
+    higher_low = (
+        lowest > previous_low
+    )
+
+    lower_high = (
+        highest < previous_high
+    )
+
+    lower_low = (
+        lowest < previous_low
+    )
+
+    bullish = (
+        higher_high
+        and higher_low
+    )
+
+    bearish = (
+        lower_high
+        and lower_low
+    )
+
+    if bullish:
+
+        trend = "BULLISH"
+
+    elif bearish:
+
+        trend = "BEARISH"
+
+    else:
+
+        trend = "RANGE"
+
+    return {
+        "trend": trend,
+        "highest": highest,
+        "lowest": lowest,
+        "current_price": current_price,
+        "higher_high": higher_high,
+        "higher_low": higher_low,
+        "lower_high": lower_high,
+        "lower_low": lower_low
+    }
