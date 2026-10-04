@@ -933,6 +933,37 @@ def detect_breakout(candles, lookback=20):
         return "BREAKDOWN"
 
     return "NONE"
+    
+# =========================================================
+# ASTER PRO — ФИЛЬТР ПЕРЕГРЕТОГО ДВИЖЕНИЯ
+# =========================================================
+
+def detect_overextension(candles, lookback=12, max_move_percent=4.0):
+
+    if len(candles) < lookback + 1:
+        return "NONE", 0
+
+    start_price = candles[-lookback-1]["close"]
+    current_price = candles[-1]["close"]
+
+    if start_price <= 0:
+        return "NONE", 0
+
+    move_percent = (
+        (current_price - start_price)
+        / start_price
+    ) * 100
+
+    # Сильный рост → возможный перегрев LONG
+    if move_percent >= max_move_percent:
+        return "LONG_OVEREXTENDED", move_percent
+
+    # Сильное падение → возможный перегрев SHORT
+    if move_percent <= -max_move_percent:
+        return "SHORT_OVEREXTENDED", move_percent
+
+    return "NONE", move_percent
+
 
 def calculate_pro_score(
     trend_1h,
@@ -1355,6 +1386,14 @@ def analyze_pro_symbol(symbol):
     )
 
     # =====================================================
+    # ФИЛЬТР ПЕРЕГРЕТОГО ДВИЖЕНИЯ
+    # =====================================================
+
+    overextension, overextension_percent = detect_overextension(
+        candles_5m
+    )
+
+    # =====================================================
     # НАПРАВЛЕНИЕ
     # =====================================================
 
@@ -1476,6 +1515,24 @@ def analyze_pro_symbol(symbol):
 
     if direction is None:
         return None
+
+    # =====================================================
+    # ФИЛЬТР ПЕРЕГРЕТОГО ДВИЖЕНИЯ
+    # =====================================================
+
+    if direction == "LONG":
+
+        if overextension == "LONG_OVEREXTENDED":
+            return None
+
+    if direction == "SHORT":
+
+        if overextension == "SHORT_OVEREXTENDED":
+            return None
+
+    # =====================================================
+    # ФИЛЬТР SUPPORT / RESISTANCE
+    # =====================================================
 
     # =====================================================
     # ФИЛЬТР SUPPORT / RESISTANCE
@@ -1657,6 +1714,8 @@ def analyze_pro_symbol(symbol):
 
         "support_distance": support_distance,
         "resistance_distance": resistance_distance
+        "overextension": overextension,
+        "overextension_percent": overextension_percent
     }
 
 # =========================================================
@@ -2073,6 +2132,8 @@ def format_pro_signal(analysis):
 
         f"📏 До Resistance: "
         f"{analysis['resistance_distance']:.2f}%\n\n"
+        f"🔥 Перегрев: "
+        f"{analysis['overextension_percent']:+.2f}%\n"
 
         "━━━━━━━━━━━━━━\n\n"
 
