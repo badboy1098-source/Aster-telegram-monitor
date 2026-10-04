@@ -1621,7 +1621,7 @@ def scan_pro_market():
 
     return setups
 
-    # =========================================================
+# =========================================================
 # ASTER PRO — ЗАЩИТА ОТ ПОВТОРНЫХ СИГНАЛОВ
 # =========================================================
 
@@ -1665,3 +1665,135 @@ def mark_pro_alert(
     pro_last_alerts[key] = (
         time.time()
     )
+
+# =========================================================
+# ASTER PRO — ФОРМИРОВАНИЕ TELEGRAM СООБЩЕНИЯ
+# =========================================================
+
+def format_pro_signal(analysis):
+
+    symbol = analysis["symbol"]
+    direction = analysis["direction"]
+
+    score = analysis["score"]
+    grade = analysis["grade"]
+
+    entry = analysis["entry"]
+    stop_loss = analysis["stop_loss"]
+
+    tp1 = analysis["tp1"]
+    tp2 = analysis["tp2"]
+    tp3 = analysis["tp3"]
+
+    risk_percent = analysis[
+        "risk_percent"
+    ]
+
+    trend_1h = analysis[
+        "trend_1h"
+    ]
+
+    structure_15m = analysis[
+        "structure_15m"
+    ]
+
+    momentum_5m = analysis[
+        "momentum_5m"
+    ]
+
+    rsi_5m = analysis[
+        "rsi_5m"
+    ]
+
+    order_book = analysis[
+        "order_book"
+    ]
+
+    buy_total = order_book[
+        "buy_total"
+    ]
+
+    sell_total = order_book[
+        "sell_total"
+    ]
+
+    imbalance = order_book[
+        "imbalance"
+    ]
+
+    rr1 = analysis[
+        "rr_tp1"
+    ]
+
+    rr2 = analysis[
+        "rr_tp2"
+    ]
+
+    rr3 = analysis[
+        "rr_tp3"
+    ]
+
+    if direction == "LONG":
+
+        direction_text = "🟢 LONG"
+
+    else:
+
+        direction_text = "🔴 SHORT"
+
+    message = (
+
+        "🧠 ASTER PRO\n\n"
+
+        f"{direction_text} — "
+        f"{symbol}\n\n"
+
+        f"🔥 Score: {score}/100\n"
+        f"{grade}\n\n"
+
+        "━━━━━━━━━━━━━━\n\n"
+
+        f"💲 Entry: {entry:.8g}\n"
+        f"🛑 Stop Loss: {stop_loss:.8g}\n\n"
+
+        f"🎯 TP1: {tp1:.8g} "
+        f"(R/R 1:{rr1})\n"
+
+        f"🎯 TP2: {tp2:.8g} "
+        f"(R/R 1:{rr2})\n"
+
+        f"🎯 TP3: {tp3:.8g} "
+        f"(R/R 1:{rr3})\n\n"
+
+        f"📉 Риск до SL: "
+        f"{risk_percent:.2f}%\n\n"
+
+        "━━━━━━━━━━━━━━\n\n"
+
+        f"📈 1H: {trend_1h}\n"
+        f"📊 15M: {structure_15m}\n"
+        f"⚡ 5M: {momentum_5m}\n"
+        f"🎯 1M: CONFIRMED\n\n"
+
+        "━━━━━━━━━━━━━━\n\n"
+
+        f"💚 BUY стакан: "
+        f"${buy_total:,.0f}\n"
+
+        f"❤️ SELL стакан: "
+        f"${sell_total:,.0f}\n"
+
+        f"⚖️ Imbalance: "
+        f"{imbalance:.2f}\n\n"
+
+        f"📊 RSI 5M: "
+        f"{rsi_5m:.1f}\n\n"
+
+        "━━━━━━━━━━━━━━\n\n"
+
+        "⚠️ ASTER PRO — "
+        "информационный сигнал.\n"
+        "Сделка автоматически НЕ открывается."
+    )
+
+    return message
