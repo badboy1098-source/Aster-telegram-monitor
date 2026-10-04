@@ -1,0 +1,28 @@
+name: ASTER PRO Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  pro-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Скачать код
+        uses: actions/checkout@v4
+
+      - name: Установить Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Установить библиотеки
+        run: pip install -r requirements.txt
+
+      - name: Запустить ASTER PRO
+        run: python -u pro_engine.py
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET: ${{ secrets.SUPABASE_SECRET }}
