@@ -1478,6 +1478,41 @@ def analyze_pro_symbol(symbol):
         return None
 
     # =====================================================
+    # ФИЛЬТР SUPPORT / RESISTANCE
+    # =====================================================
+
+    current_price = candles_5m[-1]["close"]
+
+    if (
+        support_5m is None
+        or resistance_5m is None
+        or current_price <= 0
+    ):
+        return None
+
+    resistance_distance = (
+        (resistance_5m - current_price)
+        / current_price
+    ) * 100
+
+    support_distance = (
+        (current_price - support_5m)
+        / current_price
+    ) * 100
+
+    # LONG не берём прямо под сопротивлением
+    if direction == "LONG":
+
+        if resistance_distance < 1.0:
+            return None
+
+    # SHORT не берём прямо над поддержкой
+    if direction == "SHORT":
+
+        if support_distance < 1.0:
+            return None
+
+    # =====================================================
     # SCORE
     # =====================================================
 
@@ -1490,6 +1525,82 @@ def analyze_pro_symbol(symbol):
     order_book,
     direction
     )
+
+    # =====================================================
+    # ASTER PRO — ДОПОЛНИТЕЛЬНЫЕ БАЛЛЫ
+    # =====================================================
+
+    extra_score = 0
+
+    # 📊 Всплеск объёма
+    if volume_spike:
+        extra_score += 5
+        reasons.append(
+            f"📊 Всплеск объёма x{volume_ratio:.1f}"
+        )
+
+    # 🕯 Свечной паттерн
+    if direction == "LONG" and candle_pattern in (
+        "BULLISH_ENGULFING",
+        "BULLISH_PIN"
+    ):
+        extra_score += 5
+        reasons.append(
+            f"🕯 Бычий паттерн: {candle_pattern}"
+        )
+
+    if direction == "SHORT" and candle_pattern in (
+        "BEARISH_ENGULFING",
+        "BEARISH_PIN"
+    ):
+        extra_score += 5
+        reasons.append(
+            f"🕯 Медвежий паттерн: {candle_pattern}"
+        )
+
+    # 💥 Пробой
+    if direction == "LONG" and breakout == "BREAKOUT":
+        extra_score += 5
+        reasons.append(
+            "💥 Подтверждён пробой сопротивления"
+        )
+
+    if direction == "SHORT" and breakout == "BREAKDOWN":
+        extra_score += 5
+        reasons.append(
+            "💥 Подтверждён пробой поддержки"
+        )
+
+    # 📍 Положение относительно уровней
+    if direction == "LONG" and resistance_distance >= 2.0:
+        extra_score += 5
+        reasons.append(
+            f"📍 До сопротивления: {resistance_distance:.2f}%"
+        )
+
+    if direction == "SHORT" and support_distance >= 2.0:
+        extra_score += 5
+        reasons.append(
+            f"📍 До поддержки: {support_distance:.2f}%"
+        )
+
+    score = min(
+        100,
+        score + extra_score
+    )
+
+    # Обновляем оценку после дополнительных баллов
+    if score >= 85:
+        grade = "VERY STRONG"
+
+    elif score >= 75:
+        grade = "STRONG"
+
+    elif score >= 65:
+        grade = "MODERATE"
+
+    else:
+        grade = "WEAK"
 
     # =====================================================
     # ENTRY / SL / TP
@@ -1534,7 +1645,18 @@ def analyze_pro_symbol(symbol):
 
         "rr_tp1": trade_levels["rr_tp1"],
         "rr_tp2": trade_levels["rr_tp2"],
-        "rr_tp3": trade_levels["rr_tp3"]
+        "rr_tp3": trade_levels["rr_tp3"],
+        "volume_spike": volume_spike,
+        "volume_ratio": volume_ratio,
+
+        "candle_pattern": candle_pattern,
+        "breakout": breakout,
+
+        "support_5m": support_5m,
+        "resistance_5m": resistance_5m,
+
+        "support_distance": support_distance,
+        "resistance_distance": resistance_distance
     }
 
 # =========================================================
@@ -1928,6 +2050,29 @@ def format_pro_signal(analysis):
 
         f"📊 RSI 5M: "
         f"{rsi_5m:.1f}\n\n"
+        
+        "━━━━━━━━━━━━━━\n\n"
+
+        f"📊 Объём: "
+        f"x{analysis['volume_ratio']:.1f}\n"
+
+        f"🕯 Паттерн: "
+        f"{analysis['candle_pattern']}\n"
+
+        f"💥 Пробой: "
+        f"{analysis['breakout']}\n\n"
+
+        f"🟢 Support: "
+        f"{analysis['support_5m']:.6f}\n"
+
+        f"🔴 Resistance: "
+        f"{analysis['resistance_5m']:.6f}\n\n"
+
+        f"📏 До Support: "
+        f"{analysis['support_distance']:.2f}%\n"
+
+        f"📏 До Resistance: "
+        f"{analysis['resistance_distance']:.2f}%\n\n"
 
         "━━━━━━━━━━━━━━\n\n"
 
