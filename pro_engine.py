@@ -16,6 +16,9 @@ PRO_EXCLUDED_SYMBOLS = {
 
 PRO_MIN_VOLUME = 15000
 PRO_ORDER_THRESHOLD = 15000
+PRO_ALERT_COOLDOWN = 1800
+
+pro_last_alerts = {}
 
 
 # =========================================================
@@ -1617,3 +1620,48 @@ def scan_pro_market():
     )
 
     return setups
+
+    # =========================================================
+# ASTER PRO — ЗАЩИТА ОТ ПОВТОРНЫХ СИГНАЛОВ
+# =========================================================
+
+def is_pro_cooldown_active(
+    symbol,
+    direction
+):
+
+    key = (
+        f"{symbol}_{direction}"
+    )
+
+    last_time = pro_last_alerts.get(
+        key
+    )
+
+    if last_time is None:
+        return False
+
+    elapsed = (
+        time.time()
+        - last_time
+    )
+
+    if elapsed < PRO_ALERT_COOLDOWN:
+
+        return True
+
+    return False
+
+
+def mark_pro_alert(
+    symbol,
+    direction
+):
+
+    key = (
+        f"{symbol}_{direction}"
+    )
+
+    pro_last_alerts[key] = (
+        time.time()
+    )
