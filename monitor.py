@@ -60,6 +60,49 @@ def get_subscribers():
         return []
 
 
+def get_subscriber(chat_id):
+
+    if not SUPABASE_URL or not SUPABASE_SECRET:
+        return None
+
+    url = (
+        f"{SUPABASE_URL}"
+        f"/rest/v1/subscribers"
+        f"?select=approved"
+        f"&chat_id=eq.{chat_id}"
+    )
+
+    headers = {
+        "apikey": SUPABASE_SECRET,
+        "Authorization": f"Bearer {SUPABASE_SECRET}"
+    }
+
+    try:
+
+        response = requests.get(
+            url,
+            headers=headers,
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        data = response.json()
+
+        if not data:
+            return None
+
+        return data[0]
+
+    except Exception as e:
+
+        print(
+            "❌ Ошибка проверки заявки:",
+            e
+        )
+
+        return None
+
 def add_subscriber(chat_id):
 
     if not SUPABASE_URL or not SUPABASE_SECRET:
@@ -1080,8 +1123,13 @@ def poll_telegram():
                     # ПРОВЕРЯЕМ — УЖЕ ОДОБРЕН ИЛИ НЕТ
                     # =========================================
 
-                    approved = is_approved(chat_id)
+                    subscriber = get_subscriber(chat_id)
 
+                    approved = (
+                    subscriber is not None
+                    and subscriber.get("approved", False)
+                    )
+                    
                     # =========================================
                     # ЕСЛИ УЖЕ ОДОБРЕН
                     # =========================================
@@ -1121,8 +1169,20 @@ def poll_telegram():
                     # =========================================
                     # НОВЫЙ ПОЛЬЗОВАТЕЛЬ — ЖДЁТ ОДОБРЕНИЯ
                     # =========================================
-
+                    
                     else:
+
+                        if subscriber is not None:
+
+                            send_telegram_to_chat(
+                                chat_id,
+
+                                "⏳ Ваша заявка уже отправлена.\n\n"
+                                "🔐 Доступ к сигналам Aster DEX "
+                                "ожидает одобрения администратора."
+                            )
+
+                            continue
 
                         add_subscriber(chat_id)
 
