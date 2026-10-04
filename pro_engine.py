@@ -1797,3 +1797,126 @@ def format_pro_signal(analysis):
     )
 
     return message
+
+# =========================================================
+# ASTER PRO — ПОЛУЧЕНИЕ ПОДПИСЧИКОВ
+# =========================================================
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SECRET = os.getenv("SUPABASE_SECRET")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+
+
+def get_pro_subscribers():
+
+    if not SUPABASE_URL or not SUPABASE_SECRET:
+
+        print(
+            "❌ ASTER PRO: "
+            "SUPABASE настройки не найдены"
+        )
+
+        return []
+
+    url = (
+        f"{SUPABASE_URL}"
+        f"/rest/v1/subscribers?select=chat_id"
+    )
+
+    headers = {
+        "apikey": SUPABASE_SECRET,
+        "Authorization": (
+            f"Bearer {SUPABASE_SECRET}"
+        )
+    }
+
+    try:
+
+        response = requests.get(
+            url,
+            headers=headers,
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        data = response.json()
+
+        return [
+            str(item["chat_id"])
+            for item in data
+            if item.get("chat_id")
+        ]
+
+    except Exception as e:
+
+        print(
+            "❌ ASTER PRO: "
+            "ошибка получения подписчиков:",
+            e
+        )
+
+        return []
+
+
+# =========================================================
+# ASTER PRO — ОТПРАВКА В TELEGRAM
+# =========================================================
+
+def send_pro_telegram_message(
+    message
+):
+
+    if not TELEGRAM_TOKEN:
+
+        print(
+            "❌ ASTER PRO: "
+            "TELEGRAM_TOKEN не найден"
+        )
+
+        return False
+
+    subscribers = get_pro_subscribers()
+
+    if not subscribers:
+
+        print(
+            "⚪ ASTER PRO: "
+            "подписчиков нет"
+        )
+
+        return False
+
+    url = (
+        f"https://api.telegram.org/"
+        f"bot{TELEGRAM_TOKEN}/sendMessage"
+    )
+
+    success = False
+
+    for chat_id in subscribers:
+
+        try:
+
+            response = requests.post(
+                url,
+                json={
+                    "chat_id": chat_id,
+                    "text": message
+                },
+                timeout=10
+            )
+
+            response.raise_for_status()
+
+            success = True
+
+        except Exception as e:
+
+            print(
+                f"❌ ASTER PRO Telegram "
+                f"{chat_id}:",
+                e
+            )
+
+    return success
