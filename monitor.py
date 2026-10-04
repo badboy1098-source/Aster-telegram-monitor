@@ -1119,6 +1119,8 @@ def main():
     )
 
     while True:
+        
+        check_telegram_commands()
 
         try:
 
