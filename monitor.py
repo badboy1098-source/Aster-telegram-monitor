@@ -817,7 +817,11 @@ def main():
 # TELEGRAM — ПОДПИСКА ПОЛЬЗОВАТЕЛЕЙ
 # =========================================================
 
-def send_telegram_to_chat(chat_id, message):
+def send_telegram_to_chat(
+    chat_id,
+    message,
+    reply_markup=None
+):
 
     if not TELEGRAM_TOKEN:
         return
@@ -831,6 +835,9 @@ def send_telegram_to_chat(chat_id, message):
         "chat_id": str(chat_id),
         "text": message
     }
+
+    if reply_markup:
+        data["reply_markup"] = reply_markup
 
     try:
 
@@ -1010,9 +1017,25 @@ def poll_telegram():
                                 "доступ к сигналам Aster DEX."
                             )
 
+                            buttons = {
+                                "inline_keyboard": [
+                                    [
+                                        {
+                                            "text": "✅ ОДОБРИТЬ",
+                                            "callback_data": f"approve:{chat_id}"
+                                        },
+                                        {
+                                            "text": "❌ ОТКЛОНИТЬ",
+                                            "callback_data": f"reject:{chat_id}"
+                                        }
+                                    ]
+                                ]
+                            }
+
                             send_telegram_to_chat(
                                 CHAT_ID,
-                                admin_message
+                                admin_message,
+                                buttons
                             )
 
         except Exception as e:
