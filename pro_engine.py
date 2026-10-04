@@ -1961,6 +1961,29 @@ def run_pro_scan():
                 f"отправлен"
             )
 
+# =========================================================
+# ASTER PRO — ТЕСТ TELEGRAM
+# =========================================================
+
+def test_pro_telegram():
+
+    print("")
+    print("==============================")
+    print("📨 ASTER PRO — TELEGRAM TEST")
+    print("==============================")
+
+    message = (
+        "🧠 ASTER PRO\n\n"
+        "✅ Telegram подключён!\n\n"
+        "PRO-модуль готов отправлять "
+        "торговые сетапы.\n\n"
+        "⚠️ Сделки автоматически не открываются."
+    )
+
+    return send_pro_telegram_message(
+        message
+    )
+
+
 if __name__ == "__main__":
-    test_pro_engine()
-            
+    test_pro_telegram()
