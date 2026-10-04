@@ -104,6 +104,48 @@ def add_subscriber(chat_id):
 
         return False
 
+def is_approved(chat_id):
+
+    if not SUPABASE_URL or not SUPABASE_SECRET:
+        return False
+
+    url = (
+        f"{SUPABASE_URL}"
+        f"/rest/v1/subscribers"
+        f"?select=approved"
+        f"&chat_id=eq.{chat_id}"
+    )
+
+    headers = {
+        "apikey": SUPABASE_SECRET,
+        "Authorization": f"Bearer {SUPABASE_SECRET}"
+    }
+
+    try:
+
+        response = requests.get(
+            url,
+            headers=headers,
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        data = response.json()
+
+        if not data:
+            return False
+
+        return data[0].get("approved", False)
+
+    except Exception as e:
+
+        print(
+            "❌ Ошибка проверки одобрения:",
+            e
+        )
+
+        return False
 
 # =========================================================
 # НАСТРОЙКИ
