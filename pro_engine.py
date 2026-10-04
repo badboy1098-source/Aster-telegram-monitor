@@ -1,0 +1,464 @@
+import requests
+import time
+
+
+# =========================================================
+# ASTER PRO ENGINE
+# Отдельный модуль для высоковероятностных сетапов
+# =========================================================
+
+ASTER_BASE = "https://fapi.asterdex.com"
+
+PRO_EXCLUDED_SYMBOLS = {
+    "BTCUSDT",
+    "ETHUSDT"
+}
+
+PRO_MIN_VOLUME = 15000
+PRO_ORDER_THRESHOLD = 15000
+
+
+# =========================================================
+# Получение всех подходящих монет
+# =========================================================
+
+def get_pro_symbols():
+
+    try:
+
+        url = f"{ASTER_BASE}/fapi/v1/ticker/24hr"
+
+        response = requests.get(
+            url,
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        data = response.json()
+
+        symbols = []
+
+        for item in data:
+
+            symbol = item.get("symbol", "")
+
+            if not symbol.endswith("USDT"):
+                continue
+
+            if symbol in PRO_EXCLUDED_SYMBOLS:
+                continue
+
+            try:
+                volume = float(
+                    item.get("quoteVolume", 0)
+                )
+            except:
+                continue
+
+            if volume < PRO_MIN_VOLUME:
+                continue
+
+            symbols.append(
+                (symbol, volume)
+            )
+
+        return symbols
+
+    except Exception as e:
+
+        print(
+            "❌ ASTER PRO: ошибка получения монет:",
+            e
+        )
+
+        return []
+
+
+# =========================================================
+# Получение свечей
+# =========================================================
+
+def get_pro_klines(
+    symbol,
+    interval,
+    limit=250
+):
+
+    try:
+
+        url = f"{ASTER_BASE}/fapi/v1/klines"
+
+        params = {
+            "symbol": symbol,
+            "interval": interval,
+            "limit": limit
+        }
+
+        response = requests.get(
+            url,
+            params=params,
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        return response.json()
+
+    except Exception as e:
+
+        print(
+            f"❌ ASTER PRO {symbol} {interval}:",
+            e
+        )
+
+        return []
+
+
+# =========================================================
+# Преобразование свечей
+# =========================================================
+
+def prepare_candles(klines):
+
+    candles = []
+
+    for k in klines:
+
+        try:
+
+            candles.append({
+                "open": float(k[1]),
+                "high": float(k[2]),
+                "low": float(k[3]),
+                "close": float(k[4]),
+                "volume": float(k[5])
+            })
+
+        except:
+
+            continue
+
+    return candles
+
+
+# =========================================================
+# EMA
+# =========================================================
+
+def calculate_ema(values, period):
+
+    if len(values) < period:
+        return None
+
+    multiplier = 2 / (period + 1)
+
+    ema = sum(
+        values[:period]
+    ) / period
+
+    for price in values[period:]:
+
+        ema = (
+            (price - ema) * multiplier
+        ) + ema
+
+    return ema
+
+
+# =========================================================
+# RSI
+# =========================================================
+
+def calculate_rsi(
+    values,
+    period=14
+):
+
+    if len(values) <= period:
+        return None
+
+    gains = []
+    losses = []
+
+    for i in range(1, len(values)):
+
+        change = (
+            values[i] - values[i - 1]
+        )
+
+        if change > 0:
+
+            gains.append(change)
+            losses.append(0)
+
+        else:
+
+            gains.append(0)
+            losses.append(abs(change))
+
+    avg_gain = (
+        sum(gains[:period]) / period
+    )
+
+    avg_loss = (
+        sum(losses[:period]) / period
+    )
+
+    if avg_loss == 0:
+        return 100
+
+    for i in range(
+        period,
+        len(gains)
+    ):
+
+        avg_gain = (
+            (avg_gain * (period - 1))
+            + gains[i]
+        ) / period
+
+        avg_loss = (
+            (avg_loss * (period - 1))
+            + losses[i]
+        ) / period
+
+    if avg_loss == 0:
+        return 100
+
+    rs = avg_gain / avg_loss
+
+    return 100 - (
+        100 / (1 + rs)
+    )
+
+
+# =========================================================
+# ATR
+# =========================================================
+
+def calculate_atr(
+    candles,
+    period=14
+):
+
+    if len(candles) <= period:
+        return None
+
+    true_ranges = []
+
+    for i in range(1, len(candles)):
+
+        current = candles[i]
+        previous = candles[i - 1]
+
+        tr = max(
+            current["high"]
+            - current["low"],
+
+            abs(
+                current["high"]
+                - previous["close"]
+            ),
+
+            abs(
+                current["low"]
+                - previous["close"]
+            )
+        )
+
+        true_ranges.append(tr)
+
+    if len(true_ranges) < period:
+        return None
+
+    atr = (
+        sum(true_ranges[:period])
+        / period
+    )
+
+    for tr in true_ranges[period:]:
+
+        atr = (
+            (atr * (period - 1))
+            + tr
+        ) / period
+
+    return atr
+
+
+# =========================================================
+# MACD
+# =========================================================
+
+def calculate_macd(values):
+
+    if len(values) < 35:
+        return None, None
+
+    ema12 = calculate_ema(
+        values,
+        12
+    )
+
+    ema26 = calculate_ema(
+        values,
+        26
+    )
+
+    if ema12 is None or ema26 is None:
+        return None, None
+
+    macd = ema12 - ema26
+
+    return macd, None
+
+
+# =========================================================
+# Средний объём
+# =========================================================
+
+def average_volume(
+    candles,
+    period=20
+):
+
+    if len(candles) < period:
+        return None
+
+    volumes = [
+        c["volume"]
+        for c in candles[-period:]
+    ]
+
+    return (
+        sum(volumes)
+        / len(volumes)
+    )
+
+
+# =========================================================
+# Последняя цена
+# =========================================================
+
+def get_last_price(candles):
+
+    if not candles:
+        return None
+
+    return candles[-1]["close"]
+
+
+# =========================================================
+# ASTER PRO тест
+# =========================================================
+
+def test_pro_engine():
+
+    print("")
+    print("==============================")
+    print("🧠 ASTER PRO ENGINE")
+    print("==============================")
+
+    symbols = get_pro_symbols()
+
+    print(
+        f"🔎 Монет для PRO анализа: "
+        f"{len(symbols)}"
+    )
+
+    if not symbols:
+        print(
+            "⚪ Подходящих монет нет"
+        )
+        return
+
+    symbol = symbols[0][0]
+
+    print(
+        f"🧪 Тестируем: {symbol}"
+    )
+
+    klines = get_pro_klines(
+        symbol,
+        "1h",
+        250
+    )
+
+    candles = prepare_candles(
+        klines
+    )
+
+    if not candles:
+        print(
+            "❌ Нет данных свечей"
+        )
+        return
+
+    closes = [
+        c["close"]
+        for c in candles
+    ]
+
+    ema20 = calculate_ema(
+        closes,
+        20
+    )
+
+    ema50 = calculate_ema(
+        closes,
+        50
+    )
+
+    ema200 = calculate_ema(
+        closes,
+        200
+    )
+
+    rsi = calculate_rsi(
+        closes
+    )
+
+    atr = calculate_atr(
+        candles
+    )
+
+    volume = average_volume(
+        candles
+    )
+
+    price = get_last_price(
+        candles
+    )
+
+    print(
+        f"💲 Цена: {price}"
+    )
+
+    print(
+        f"📈 EMA20: {ema20}"
+    )
+
+    print(
+        f"📈 EMA50: {ema50}"
+    )
+
+    print(
+        f"📈 EMA200: {ema200}"
+    )
+
+    print(
+        f"📊 RSI: {rsi}"
+    )
+
+    print(
+        f"📐 ATR: {atr}"
+    )
+
+    print(
+        f"💰 Средний объём: {volume}"
+    )
+
+    print(
+        "✅ ASTER PRO ENGINE работает"
+    )
