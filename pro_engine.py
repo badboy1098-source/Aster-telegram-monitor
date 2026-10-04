@@ -959,3 +959,138 @@ def calculate_pro_score(
         "grade": grade,
         "reasons": reasons
     }
+    
+# =========================================================
+# ASTER PRO — ENTRY / STOP LOSS / TAKE PROFIT
+# =========================================================
+
+def calculate_trade_levels(
+    candles,
+    direction,
+    atr
+):
+
+    if not candles or atr is None or atr <= 0:
+        return None
+
+    current_price = candles[-1]["close"]
+
+    recent = candles[-20:]
+
+    recent_high = max(
+        c["high"]
+        for c in recent
+    )
+
+    recent_low = min(
+        c["low"]
+        for c in recent
+    )
+
+    # -----------------------------------------------------
+    # LONG
+    # -----------------------------------------------------
+
+    if direction == "LONG":
+
+        entry = current_price
+
+        structure_stop = (
+            recent_low - atr * 0.30
+        )
+
+        atr_stop = (
+            entry - atr * 1.20
+        )
+
+        stop_loss = min(
+            structure_stop,
+            atr_stop
+        )
+
+        risk = (
+            entry - stop_loss
+        )
+
+        if risk <= 0:
+            return None
+
+        tp1 = (
+            entry + risk * 1.5
+        )
+
+        tp2 = (
+            entry + risk * 2.5
+        )
+
+        tp3 = (
+            entry + risk * 3.5
+        )
+
+    # -----------------------------------------------------
+    # SHORT
+    # -----------------------------------------------------
+
+    elif direction == "SHORT":
+
+        entry = current_price
+
+        structure_stop = (
+            recent_high + atr * 0.30
+        )
+
+        atr_stop = (
+            entry + atr * 1.20
+        )
+
+        stop_loss = max(
+            structure_stop,
+            atr_stop
+        )
+
+        risk = (
+            stop_loss - entry
+        )
+
+        if risk <= 0:
+            return None
+
+        tp1 = (
+            entry - risk * 1.5
+        )
+
+        tp2 = (
+            entry - risk * 2.5
+        )
+
+        tp3 = (
+            entry - risk * 3.5
+        )
+
+    else:
+
+        return None
+
+    rr_tp1 = 1.5
+    rr_tp2 = 2.5
+    rr_tp3 = 3.5
+
+    risk_percent = (
+        abs(
+            entry - stop_loss
+        )
+        / entry
+    ) * 100
+
+    return {
+        "direction": direction,
+        "entry": entry,
+        "stop_loss": stop_loss,
+        "tp1": tp1,
+        "tp2": tp2,
+        "tp3": tp3,
+        "risk_percent": risk_percent,
+        "rr_tp1": rr_tp1,
+        "rr_tp2": rr_tp2,
+        "rr_tp3": rr_tp3
+    }
