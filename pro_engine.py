@@ -291,27 +291,58 @@ def calculate_atr(
 # MACD
 # =========================================================
 
-def calculate_macd(values):
+def calculate_macd(
+    values,
+    fast_period=12,
+    slow_period=26,
+    signal_period=9
+):
 
-    if len(values) < 35:
-        return None, None
+    if len(values) < slow_period + signal_period:
+        return None, None, None
 
-    ema12 = calculate_ema(
-        values,
-        12
+    macd_values = []
+
+    for i in range(
+        slow_period,
+        len(values) + 1
+    ):
+
+        window = values[:i]
+
+        ema_fast = calculate_ema(
+            window,
+            fast_period
+        )
+
+        ema_slow = calculate_ema(
+            window,
+            slow_period
+        )
+
+        if ema_fast is None or ema_slow is None:
+            continue
+
+        macd_values.append(
+            ema_fast - ema_slow
+        )
+
+    if len(macd_values) < signal_period:
+        return None, None, None
+
+    signal = calculate_ema(
+        macd_values,
+        signal_period
     )
 
-    ema26 = calculate_ema(
-        values,
-        26
-    )
+    if signal is None:
+        return None, None, None
 
-    if ema12 is None or ema26 is None:
-        return None, None
+    macd = macd_values[-1]
 
-    macd = ema12 - ema26
+    histogram = macd - signal
 
-    return macd, None
+    return macd, signal, histogram
 
 
 # =========================================================
