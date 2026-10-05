@@ -2190,12 +2190,12 @@ def get_pro_subscribers():
 
         data = response.json()
 
-        subscribers = [
+        subscribers = list(dict.fromkeys(
             str(item["chat_id"])
             for item in data
             if item.get("chat_id")
             and item.get("approved") is True
-        ]
+        ))
 
         print(
             f"✅ ASTER PRO: "
