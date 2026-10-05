@@ -44,11 +44,11 @@ def get_subscribers():
 
         data = response.json()
 
-        return [
-            str(item["chat_id"])
-            for item in data
-            if item.get("chat_id")
-        ]
+        return list(dict.fromkeys(
+        str(item["chat_id"])
+        for item in data
+        if item.get("chat_id")
+        ))
 
     except Exception as e:
 
