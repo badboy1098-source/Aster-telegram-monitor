@@ -903,6 +903,7 @@ def send_telegram_to_chat(
 # TELEGRAM — ОБРАБОТКА КНОПОК ОДОБРИТЬ / ОТКЛОНИТЬ
 # =========================================================
 
+
 def handle_callback(callback_query):
 
     if not callback_query:
@@ -923,16 +924,29 @@ def handle_callback(callback_query):
 
     # Только администратор может нажимать кнопки
     if not CHAT_ID or admin_id != str(CHAT_ID):
-
         return
 
     if ":" not in data:
-
         return
 
     action, user_chat_id = data.split(
         ":",
         1
+    )
+
+    # Сообщение с заявкой, на котором были кнопки
+    message = callback_query.get(
+        "message",
+        {}
+    )
+
+    admin_chat_id = message.get(
+        "chat",
+        {}
+    ).get("id")
+
+    message_id = message.get(
+        "message_id"
     )
 
     # =====================================================
@@ -967,6 +981,7 @@ def handle_callback(callback_query):
 
             response.raise_for_status()
 
+            # Отправляем пользователю подтверждение
             send_telegram_to_chat(
                 user_chat_id,
 
@@ -978,6 +993,42 @@ def handle_callback(callback_query):
                 "📊 Порог движения: ±3% за 1M\n"
                 "💰 Стакан: от $15,000"
             )
+
+            # =================================================
+            # МЕНЯЕМ ЗАЯВКУ У АДМИНИСТРАТОРА
+            # =================================================
+
+            if admin_chat_id and message_id:
+
+                edit_url = (
+                    f"https://api.telegram.org/"
+                    f"bot{TELEGRAM_TOKEN}/editMessageText"
+                )
+
+                approved_text = (
+                    "🔔 НОВАЯ ЗАЯВКА\n\n"
+
+                    f"🆔 Chat ID: {user_chat_id}\n\n"
+
+                    "━━━━━━━━━━━━━━\n\n"
+
+                    "✅ ЗАЯВКА ОДОБРЕНА\n\n"
+
+                    "👤 Пользователь получил доступ "
+                    "к сигналам Aster DEX."
+                )
+                requests.post(
+                edit_url,
+                json={
+                "chat_id": admin_chat_id,
+                "message_id": message_id,
+                "text": approved_text,
+                "reply_markup": {
+                "inline_keyboard": []
+                }
+                },
+                timeout=10
+                )
 
             print(
                 f"✅ Пользователь {user_chat_id} одобрен"
@@ -1004,6 +1055,52 @@ def handle_callback(callback_query):
             "Доступ к сигналам Aster DEX "
             "пока не предоставлен."
         )
+
+        # =================================================
+        # МЕНЯЕМ ЗАЯВКУ У АДМИНИСТРАТОРА
+        # =================================================
+
+        if admin_chat_id and message_id:
+
+            edit_url = (
+                f"https://api.telegram.org/"
+                f"bot{TELEGRAM_TOKEN}/editMessageText"
+            )
+
+            rejected_text = (
+                "🔔 НОВАЯ ЗАЯВКА\n\n"
+
+                f"🆔 Chat ID: {user_chat_id}\n\n"
+
+                "━━━━━━━━━━━━━━\n\n"
+
+                "❌ ЗАЯВКА ОТКЛОНЕНА\n\n"
+
+                "👤 Пользователь не получил "
+                "доступ к сигналам Aster DEX."
+            )
+
+            try:
+
+                requests.post(
+                edit_url,
+                json={
+                "chat_id": admin_chat_id,
+                "message_id": message_id,
+                "text": rejected_text,
+                "reply_markup": {
+                "inline_keyboard": []
+                }
+                },
+                timeout=10
+                )
+
+            except Exception as e:
+
+                print(
+                    "❌ Ошибка изменения заявки:",
+                    e
+                )
 
         print(
             f"❌ Пользователь {user_chat_id} отклонён"
@@ -1035,7 +1132,7 @@ def handle_callback(callback_query):
             print(
                 "❌ Ошибка callback:",
                 e
-            )
+            )    
 
 def poll_telegram():
 
