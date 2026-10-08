@@ -15,10 +15,7 @@ import trader
 
 ASTER_BASE = "https://fapi.asterdex.com"
 
-PRO_EXCLUDED_SYMBOLS = {
-    "BTCUSDT",
-    "ETHUSDT"
-}
+PRO_EXCLUDED_SYMBOLS = set()
 
 PRO_MIN_VOLUME = 15000
 PRO_ORDER_THRESHOLD = 15000
@@ -1829,14 +1826,15 @@ def is_valid_pro_setup(
     if not entry_confirmation:
         return False
 
-    # Минимальный R/R до TP1
+    # Минимальный R/R до TP3
 
     rr = analysis.get(
-        "rr_tp1",
+        "rr_tp3",
         0
     )
 
-    if rr < 1.5:
+    if rr < 3.0:
+        
         return False
 
     return True
@@ -2392,7 +2390,7 @@ if __name__ == "__main__":
 
     print("🧠 ASTER PRO ЗАПУЩЕН")
     print("⏱ Интервал сканирования: 5 минут")
-    print("🚫 BTCUSDT и ETHUSDT исключены")
+    print("🪙 BTCUSDT и ETHUSDT включены в PRO-анализ")
     print("⚠️ Автоматические сделки НЕ открываются")
 
     while True:
