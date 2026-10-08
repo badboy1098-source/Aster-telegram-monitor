@@ -367,8 +367,29 @@ def paper_trade(signal):
     log(f"📦 Количество: {quantity}")
     log(f"💵 PAPER баланс: {balance}")
     log(f"🆔 Trade ID: {trade_id}")
+    
     log("🚫 РЕАЛЬНЫЙ ОРДЕР НЕ ОТПРАВЛЕН")
     log("=" * 60)
+
+    # ---------------------------------------------------------
+    # ЛИЧНОЕ УВЕДОМЛЕНИЕ ВЛАДЕЛЬЦУ
+    # ---------------------------------------------------------
+
+    trader_message = (
+        "🧪 ASTER PAPER TRADE\n\n"
+        f"📊 Монета: {symbol}\n"
+        f"📈 Направление: {direction}\n"
+        f"💰 Entry: {entry}\n"
+        f"🛑 Stop Loss: {stop}\n"
+        f"🎯 Target: {target}\n"
+        f"📐 RR: 1:{rr:.2f}\n"
+        f"⚠️ Риск: {RISK_PER_TRADE * 100:.2f}%\n"
+        f"📦 Количество: {quantity:.6f}\n"
+        f"💵 PAPER баланс: ${balance:.2f}\n\n"
+        "🚫 Реальный ордер НЕ отправлен."
+    )
+
+    send_trader_telegram(trader_message)
 
     return True
 
