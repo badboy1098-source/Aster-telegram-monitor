@@ -21,7 +21,9 @@ RISK_PER_TRADE = 0.01          # 1%
 MIN_RR = 3.0                    # минимум 1:3
 MAX_OPEN_POSITIONS = 3
 
-ALLOWED_SYMBOLS = set()         # пока пусто — сделки не открываются
+# Пока пусто — автоматические сделки запрещены.
+# Позже сюда добавим разрешённые символы.
+ALLOWED_SYMBOLS = set()
 
 TRADER_CHAT_ID = os.getenv("TRADER_CHAT_ID")
 
@@ -40,8 +42,8 @@ def log(message):
 
 def get_account_balance():
     """
-    Пока PAPER MODE.
-    Позже здесь будет получение реального баланса Aster.
+    PAPER MODE.
+    Реальный баланс Aster пока НЕ запрашивается.
     """
     return None
 
@@ -54,7 +56,8 @@ def calculate_position_size(
 ):
     """
     Рассчитывает размер позиции так,
-    чтобы риск до SL составлял не более заданного процента.
+    чтобы риск до Stop Loss составлял
+    не более заданного процента баланса.
     """
 
     if balance <= 0:
@@ -96,53 +99,92 @@ def calculate_rr(entry, stop, target):
 
 def validate_trade_signal(signal):
     """
-    Финальная проверка перед потенциальным входом.
+    Финальная проверка сигнала перед PAPER/REAL торговлей.
 
-    Здесь позже будут:
-    - Score ASTER PRO
-    - 1H trend
-    - 15M structure
-    - 5M confirmation
-    - 1M confirmation
-    - RSI
-    - EMA
-    - MACD
-    - ATR
-    - volume
-    - order book
-    - overextension
-    - RR
+    Реальный ордер здесь пока НЕ отправляется.
     """
 
-    if not signal:
-        return False, "Пустой сигнал"
-
     symbol = signal.get("symbol")
+    direction = signal.get("direction")
+    entry = signal.get("entry")
+    stop = signal.get("stop_loss")
+
+    # Для автоматической торговли используем TP3,
+    # потому что минимальный RR должен быть 1:3.
+    target = signal.get("tp3")
 
     if not symbol:
-        return False, "Нет символа"
+        return False, "Нет symbol"
 
-    if symbol not in ALLOWED_SYMBOLS:
-        return False, f"{symbol} пока не разрешён"
+    if not direction:
+        return False, "Нет direction"
 
-    side = signal.get("side")
+    direction = direction.upper()
 
-    if side not in ("LONG", "SHORT"):
-        return False, "Неверное направление"
+    if direction not in {"LONG", "SHORT"}:
+        return False, f"Неверное направление: {direction}"
 
-    entry = signal.get("entry")
-    stop = signal.get("stop")
-    target = signal.get("target")
+    if entry is None or stop is None or target is None:
+        return False, "Не хватает entry / stop_loss / tp3"
 
-    if not all([entry, stop, target]):
-        return False, "Не хватает Entry / SL / TP"
+    try:
+        entry = float(entry)
+        stop = float(stop)
+        target = float(target)
+    except (TypeError, ValueError):
+        return False, "Некорректные цены"
 
-    rr = calculate_rr(entry, stop, target)
+    if entry <= 0 or stop <= 0 or target <= 0:
+        return False, "Цена должна быть больше 0"
+
+    # ---------------------------------------------------------
+    # Проверяем Stop Loss и Target
+    # ---------------------------------------------------------
+
+    if direction == "LONG":
+
+        if stop >= entry:
+            return False, "LONG: Stop Loss должен быть ниже Entry"
+
+        if target <= entry:
+            return False, "LONG: TP3 должен быть выше Entry"
+
+    elif direction == "SHORT":
+
+        if stop <= entry:
+            return False, "SHORT: Stop Loss должен быть выше Entry"
+
+        if target >= entry:
+            return False, "SHORT: TP3 должен быть ниже Entry"
+
+    # ---------------------------------------------------------
+    # Проверяем RR
+    # ---------------------------------------------------------
+
+    rr = calculate_rr(
+        entry,
+        stop,
+        target
+    )
 
     if rr < MIN_RR:
-        return False, f"RR {rr:.2f} меньше минимального {MIN_RR}"
+        return False, f"RR слишком маленький: {rr:.2f}"
 
-    return True, "Сигнал прошёл базовую проверку"
+    # ---------------------------------------------------------
+    # Проверяем разрешённые монеты
+    # ---------------------------------------------------------
+
+    if ALLOWED_SYMBOLS and symbol not in ALLOWED_SYMBOLS:
+        return False, f"{symbol} запрещён для автоторговли"
+
+    return True, {
+        "symbol": symbol,
+        "direction": direction,
+        "entry": entry,
+        "stop_loss": stop,
+        "target": target,
+        "rr": rr
+    }
 
 
 # =========================================================
@@ -152,54 +194,188 @@ def validate_trade_signal(signal):
 def paper_trade(signal):
     """
     Имитация сделки.
+
     Реальный ордер НЕ отправляется.
     """
 
-    symbol = signal["symbol"]
+    symbol = signal.get("symbol")
+
+    if not symbol:
+        log("❌ PAPER: отсутствует symbol")
+        return False
+
+    # ---------------------------------------------------------
+    # Защита от повторного входа
+    # ---------------------------------------------------------
 
     if symbol in active_trades:
         log(
-            f"⛔ {symbol}: позиция уже существует. "
-            f"Повторный вход запрещён."
+            f"⛔ PAPER: {symbol} уже находится "
+            f"в активной позиции."
         )
         return False
 
-    valid, reason = validate_trade_signal(signal)
+    # ---------------------------------------------------------
+    # Финальная проверка
+    # ---------------------------------------------------------
+
+    valid, result = validate_trade_signal(signal)
 
     if not valid:
-        log(f"❌ {symbol}: {reason}")
+        log(f"❌ PAPER: {symbol}: {result}")
         return False
 
-    entry = float(signal["entry"])
-    stop = float(signal["stop"])
-    target = float(signal["target"])
+    symbol = result["symbol"]
+    direction = result["direction"]
+    entry = result["entry"]
+    stop = result["stop_loss"]
+    target = result["target"]
+    rr = result["rr"]
 
-    # Временно используем тестовый баланс.
-    # Позже здесь будет реальный баланс Aster.
-    paper_balance = float(
-        signal.get("paper_balance", 1000)
-    )
+    # ---------------------------------------------------------
+    # Лимит одновременных позиций
+    # ---------------------------------------------------------
+
+    if len(active_trades) >= MAX_OPEN_POSITIONS:
+        log(
+            f"⛔ PAPER: достигнут лимит "
+            f"{MAX_OPEN_POSITIONS} позиций."
+        )
+        return False
+
+    # ---------------------------------------------------------
+    # PAPER баланс
+    # ---------------------------------------------------------
+
+    balance = signal.get("paper_balance")
+
+    if balance is None:
+        balance = 1000.0
+
+    try:
+        balance = float(balance)
+    except (TypeError, ValueError):
+        log("❌ PAPER: некорректный paper_balance")
+        return False
+
+    # ---------------------------------------------------------
+    # Размер позиции
+    # ---------------------------------------------------------
 
     quantity = calculate_position_size(
-        paper_balance,
-        entry,
-        stop
+        balance=balance,
+        entry_price=entry,
+        stop_price=stop,
+        risk_percent=RISK_PER_TRADE
     )
 
-    rr = calculate_rr(
-        entry,
-        stop,
-        target
-    )
+    if quantity <= 0:
+        log("❌ PAPER: некорректный размер позиции")
+        return False
+
+    # ---------------------------------------------------------
+    # Trade ID
+    # ---------------------------------------------------------
 
     trade_id = (
         f"{symbol}_"
-        f"{signal['side']}_"
-        f"{entry}"
+        f"{direction}_"
+        f"{entry}_"
+        f"{stop}"
     )
 
     if trade_id in completed_trade_ids:
-        log(f"⛔ Дубликат сделки: {trade_id}")
+        log(
+            f"⛔ PAPER: дубликат сделки "
+            f"{trade_id}"
+        )
         return False
 
-    active
+    # ---------------------------------------------------------
+    # Сохраняем активную сделку
+    # ---------------------------------------------------------
+
+    active_trades[symbol] = {
+        "trade_id": trade_id,
+        "symbol": symbol,
+        "direction": direction,
+        "entry": entry,
+        "stop_loss": stop,
+        "target": target,
+        "quantity": quantity,
+        "balance": balance,
+        "risk_percent": RISK_PER_TRADE,
+        "rr": rr,
+        "status": "PAPER_OPEN",
+        "created_at": time.time()
+    }
+
+    # ---------------------------------------------------------
+    # Лог
+    # ---------------------------------------------------------
+
+    log("=" * 60)
+    log("🧪 PAPER TRADE ОТКРЫТА")
+    log(f"📊 Монета: {symbol}")
+    log(f"📈 Направление: {direction}")
+    log(f"💰 Entry: {entry}")
+    log(f"🛑 Stop Loss: {stop}")
+    log(f"🎯 Target: {target}")
+    log(f"📐 RR: 1:{rr:.2f}")
+    log(f"⚠️ Риск: {RISK_PER_TRADE * 100:.2f}%")
+    log(f"📦 Количество: {quantity}")
+    log(f"💵 PAPER баланс: {balance}")
+    log(f"🆔 Trade ID: {trade_id}")
+    log("🚫 РЕАЛЬНЫЙ ОРДЕР НЕ ОТПРАВЛЕН")
+    log("=" * 60)
+
+    return True
+
+
+# =========================================================
+# ЗАКРЫТИЕ PAPER-СДЕЛКИ
+# =========================================================
+
+def close_paper_trade(symbol, reason="MANUAL"):
+    """
+    Закрывает виртуальную сделку.
+    Реальный ордер не отправляется.
+    """
+
+    if symbol not in active_trades:
+        log(
+            f"ℹ️ PAPER: активной сделки "
+            f"{symbol} нет."
+        )
+        return False
+
+    trade = active_trades.pop(symbol)
+
+    completed_trade_ids.add(
+        trade["trade_id"]
+    )
+
+    log("=" * 60)
+    log("🧪 PAPER TRADE ЗАКРЫТА")
+    log(f"📊 Монета: {symbol}")
+    log(f"📈 Направление: {trade['direction']}")
+    log(f"🆔 Trade ID: {trade['trade_id']}")
+    log(f"📌 Причина: {reason}")
+    log("=" * 60)
+
+    return True
+
+
+# =========================================================
+# ТЕСТОВЫЙ ЗАПУСК
+# =========================================================
+
+if __name__ == "__main__":
+
+    log("🚀 ASTER AUTO TRADER запущен")
+    log("🧪 PAPER MODE: ON")
+    log(f"⚠️ Риск на сделку: {RISK_PER_TRADE * 100:.2f}%")
+    log(f"📐 Минимальный RR: 1:{MIN_RR:.1f}")
+    log(f"📊 Максимум позиций: {MAX_OPEN_POSITIONS}")
+    log("🚫 Реальные ордера: OFF")
+    log("⏳ Ожидание подключения ASTER PRO...")
