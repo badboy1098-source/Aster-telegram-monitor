@@ -1,6 +1,8 @@
 import os
 import requests
 import time
+import threading
+
 # =========================================================
 # ASTER AUTO TRADER — PAPER MODE
 # =========================================================
@@ -2361,6 +2363,43 @@ def run_pro_scan():
                 f"{symbol} {direction} "
                 f"отправлен"
             )
+
+# =========================================================
+# ASTER PAPER TRADER — ПОСТОЯННЫЙ КОНТРОЛЬ ПОЗИЦИЙ
+# =========================================================
+
+def paper_position_monitor():
+
+    print("🧪 PAPER MONITOR ЗАПУЩЕН")
+    print("⏱ Проверка открытых позиций: каждые 10 секунд")
+
+    while True:
+
+        try:
+
+            trader.check_paper_positions()
+
+        except Exception as e:
+
+            print(
+                "❌ PAPER MONITOR ошибка:",
+                e
+            )
+
+        time.sleep(10)
+
+
+# =========================================================
+# ЗАПУСК PAPER MONITOR В ФОНОВОМ ПОТОКЕ
+# =========================================================
+
+paper_monitor_thread = threading.Thread(
+    target=paper_position_monitor,
+    daemon=True
+)
+
+paper_monitor_thread.start()
+
 
 # =========================================================
 # ASTER PRO — ТЕСТ TELEGRAM
