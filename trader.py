@@ -1,6 +1,7 @@
 import os
 import time
 import math
+import json
 import requests
 
 
@@ -22,10 +23,13 @@ MIN_RR = 3.0                    # минимум 1:3
 MAX_OPEN_POSITIONS = 3
 
 PAPER_START_BALANCE = 100.0
+
+# Файл для сохранения PAPER-состояния
+PAPER_STATE_FILE = "paper_state.json"
+
 paper_balance = PAPER_START_BALANCE
 
-# Пока пусто — автоматические сделки запрещены.
-# Позже сюда добавим разрешённые символы.
+# Пустой список = ограничений по монетам нет
 ALLOWED_SYMBOLS = set()
 
 TRADER_CHAT_ID = os.getenv("TRADER_CHAT_ID")
@@ -33,6 +37,104 @@ TRADER_CHAT_ID = os.getenv("TRADER_CHAT_ID")
 # Защита от повторных сделок
 active_trades = {}
 completed_trade_ids = set()
+
+# =========================================================
+# PAPER STATE — СОХРАНЕНИЕ СОСТОЯНИЯ
+# =========================================================
+
+def save_paper_state():
+    """
+    Сохраняет PAPER баланс и активные сделки.
+    """
+
+    try:
+        state = {
+            "paper_balance": paper_balance,
+            "active_trades": active_trades,
+            "completed_trade_ids": list(completed_trade_ids)
+        }
+
+        with open(PAPER_STATE_FILE, "w", encoding="utf-8") as f:
+            json.dump(
+                state,
+                f,
+                ensure_ascii=False,
+                indent=2
+            )
+
+    except Exception as e:
+        log(f"❌ PAPER: ошибка сохранения состояния: {e}")
+
+
+def load_paper_state():
+    """
+    Загружает PAPER состояние после запуска.
+    """
+
+    global paper_balance
+    global active_trades
+    global completed_trade_ids
+
+    if not os.path.exists(PAPER_STATE_FILE):
+        log(
+            f"ℹ️ PAPER: файл {PAPER_STATE_FILE} "
+            f"не найден."
+        )
+        log(
+            f"💵 Используется стартовый баланс: "
+            f"${PAPER_START_BALANCE:.2f}"
+        )
+        return
+
+    try:
+
+        with open(
+            PAPER_STATE_FILE,
+            "r",
+            encoding="utf-8"
+        ) as f:
+
+            state = json.load(f)
+
+        paper_balance = float(
+            state.get(
+                "paper_balance",
+                PAPER_START_BALANCE
+            )
+        )
+
+        active_trades = state.get(
+            "active_trades",
+            {}
+        )
+
+        completed_trade_ids = set(
+            state.get(
+                "completed_trade_ids",
+                []
+            )
+        )
+
+        log("✅ PAPER состояние загружено")
+        log(
+            f"💵 PAPER баланс: "
+            f"${paper_balance:.2f}"
+        )
+        log(
+            f"📊 Активных позиций: "
+            f"{len(active_trades)}"
+        )
+
+    except Exception as e:
+
+        log(
+            f"❌ PAPER: ошибка загрузки "
+            f"состояния: {e}"
+        )
+        log(
+            f"⚠️ Используется стартовый баланс: "
+            f"${PAPER_START_BALANCE:.2f}"
+        )
 
 
 # =========================================================
@@ -351,6 +453,8 @@ def paper_trade(signal):
         "created_at": time.time()
     }
 
+    save_paper_state()
+
     # ---------------------------------------------------------
     # Лог
     # ---------------------------------------------------------
@@ -448,6 +552,8 @@ def close_paper_trade(symbol, exit_price, reason="MANUAL"):
     completed_trade_ids.add(
         trade["trade_id"]
     )
+    
+    save_paper_state()
 
     # ---------------------------------------------------------
     # Лог
@@ -593,6 +699,12 @@ def check_paper_positions():
                     current_price,
                     "TAKE_PROFIT"
                 )
+
+# =========================================================
+# ЗАГРУЗКА PAPER СОСТОЯНИЯ ПРИ ИМПОРТЕ МОДУЛЯ
+# =========================================================
+
+load_paper_state()
 
 
 # =========================================================
