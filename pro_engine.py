@@ -2390,18 +2390,6 @@ def paper_position_monitor():
 
 
 # =========================================================
-# ЗАПУСК PAPER MONITOR В ФОНОВОМ ПОТОКЕ
-# =========================================================
-
-paper_monitor_thread = threading.Thread(
-    target=paper_position_monitor,
-    daemon=True
-)
-
-paper_monitor_thread.start()
-
-
-# =========================================================
 # ASTER PRO — ТЕСТ TELEGRAM
 # =========================================================
 
@@ -2428,6 +2416,14 @@ def test_pro_telegram():
 if __name__ == "__main__":
 
     print("🧠 ASTER PRO ЗАПУЩЕН")
+
+    paper_monitor_thread = threading.Thread(
+        target=paper_position_monitor,
+        daemon=True
+    )
+
+    paper_monitor_thread.start()
+
     print("⏱ Интервал сканирования: 5 минут")
     print("🪙 BTCUSDT и ETHUSDT включены в PRO-анализ")
     print("⚠️ Автоматические сделки НЕ открываются")
