@@ -2333,6 +2333,16 @@ def run_pro_scan():
 
             continue
 
+        # =====================================================
+        # ASTER AUTO TRADER — PAPER MODE
+        # =====================================================
+
+        if trader.AUTO_TRADE is False:
+
+            trader.paper_trade(
+                analysis
+            )
+
         message = format_pro_signal(
             analysis
         )
