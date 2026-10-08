@@ -300,6 +300,21 @@ def paper_trade(signal):
         return False
 
     # ---------------------------------------------------------
+    # Размер позиции
+    # ---------------------------------------------------------
+
+    quantity = calculate_position_size(
+        balance=balance,
+        entry_price=entry,
+        stop_price=stop,
+        risk_percent=RISK_PER_TRADE
+    )
+
+    if quantity <= 0:
+        log("❌ PAPER: некорректный размер позиции")
+        return False
+
+    # ---------------------------------------------------------
     # Trade ID
     # ---------------------------------------------------------
 
@@ -383,11 +398,14 @@ def paper_trade(signal):
 # ЗАКРЫТИЕ PAPER-СДЕЛКИ
 # =========================================================
 
-def close_paper_trade(symbol, reason="MANUAL"):
+def close_paper_trade(symbol, exit_price, reason="MANUAL"):
     """
-    Закрывает виртуальную сделку.
-    Реальный ордер не отправляется.
+    Закрывает виртуальную сделку,
+    рассчитывает прибыль/убыток
+    и обновляет PAPER баланс.
     """
+
+    global paper_balance
 
     if symbol not in active_trades:
         log(
@@ -396,21 +414,185 @@ def close_paper_trade(symbol, reason="MANUAL"):
         )
         return False
 
+    try:
+        exit_price = float(exit_price)
+    except (TypeError, ValueError):
+        log("❌ PAPER: некорректная цена выхода")
+        return False
+
     trade = active_trades.pop(symbol)
+
+    entry = trade["entry"]
+    quantity = trade["quantity"]
+    direction = trade["direction"]
+
+    # ---------------------------------------------------------
+    # Расчёт PnL
+    # ---------------------------------------------------------
+
+    if direction == "LONG":
+        pnl = (exit_price - entry) * quantity
+    else:
+        pnl = (entry - exit_price) * quantity
+
+    old_balance = paper_balance
+    paper_balance += pnl
+
+    # ---------------------------------------------------------
+    # Защита от отрицательного баланса
+    # ---------------------------------------------------------
+
+    if paper_balance < 0:
+        paper_balance = 0
 
     completed_trade_ids.add(
         trade["trade_id"]
     )
 
+    # ---------------------------------------------------------
+    # Лог
+    # ---------------------------------------------------------
+
     log("=" * 60)
     log("🧪 PAPER TRADE ЗАКРЫТА")
     log(f"📊 Монета: {symbol}")
-    log(f"📈 Направление: {trade['direction']}")
-    log(f"🆔 Trade ID: {trade['trade_id']}")
+    log(f"📈 Направление: {direction}")
+    log(f"💰 Entry: {entry}")
+    log(f"🏁 Exit: {exit_price}")
+    log(f"📦 Количество: {quantity}")
+    log(f"💵 PnL: {pnl:+.2f} USDT")
+    log(f"💵 Баланс до сделки: {old_balance:.2f} USDT")
+    log(f"💵 Новый PAPER баланс: {paper_balance:.2f} USDT")
     log(f"📌 Причина: {reason}")
+    log(f"🆔 Trade ID: {trade['trade_id']}")
     log("=" * 60)
 
+    # ---------------------------------------------------------
+    # Личное уведомление
+    # ---------------------------------------------------------
+
+    trader_message = (
+        "🧪 ASTER PAPER TRADE ЗАКРЫТА\n\n"
+        f"📊 Монета: {symbol}\n"
+        f"📈 Направление: {direction}\n"
+        f"💰 Entry: {entry}\n"
+        f"🏁 Exit: {exit_price}\n"
+        f"💵 PnL: {pnl:+.2f} USDT\n"
+        f"💰 Баланс: ${paper_balance:.2f}\n"
+        f"📌 Причина: {reason}"
+    )
+
+    send_trader_telegram(trader_message)
+
     return True
+
+# =========================================================
+# PAPER POSITION MONITOR
+# =========================================================
+
+def check_paper_positions():
+    """
+    Проверяет активные PAPER-позиции.
+    Если цена достигла Stop Loss или Target —
+    автоматически закрывает виртуальную сделку.
+    """
+
+    if not active_trades:
+        return
+
+    for symbol in list(active_trades.keys()):
+
+        trade = active_trades.get(symbol)
+
+        if not trade:
+            continue
+
+        try:
+            response = requests.get(
+                f"{ASTER_BASE}/fapi/v1/ticker/price",
+                params={"symbol": symbol},
+                timeout=10
+            )
+
+            response.raise_for_status()
+
+            data = response.json()
+            current_price = float(data["price"])
+
+        except Exception as e:
+            log(
+                f"❌ PAPER: ошибка получения цены "
+                f"{symbol}: {e}"
+            )
+            continue
+
+        direction = trade["direction"]
+        stop = trade["stop_loss"]
+        target = trade["target"]
+
+        # -----------------------------------------------------
+        # LONG
+        # -----------------------------------------------------
+
+        if direction == "LONG":
+
+            if current_price <= stop:
+
+                log(
+                    f"🛑 PAPER SL: {symbol} "
+                    f"цена {current_price}"
+                )
+
+                close_paper_trade(
+                    symbol,
+                    current_price,
+                    "STOP_LOSS"
+                )
+
+            elif current_price >= target:
+
+                log(
+                    f"🎯 PAPER TP: {symbol} "
+                    f"цена {current_price}"
+                )
+
+                close_paper_trade(
+                    symbol,
+                    current_price,
+                    "TAKE_PROFIT"
+                )
+
+        # -----------------------------------------------------
+        # SHORT
+        # -----------------------------------------------------
+
+        elif direction == "SHORT":
+
+            if current_price >= stop:
+
+                log(
+                    f"🛑 PAPER SL: {symbol} "
+                    f"цена {current_price}"
+                )
+
+                close_paper_trade(
+                    symbol,
+                    current_price,
+                    "STOP_LOSS"
+                )
+
+            elif current_price <= target:
+
+                log(
+                    f"🎯 PAPER TP: {symbol} "
+                    f"цена {current_price}"
+                )
+
+                close_paper_trade(
+                    symbol,
+                    current_price,
+                    "TAKE_PROFIT"
+                )
 
 
 # =========================================================
