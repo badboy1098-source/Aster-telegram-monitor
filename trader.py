@@ -21,6 +21,9 @@ RISK_PER_TRADE = 0.01          # 1%
 MIN_RR = 3.0                    # минимум 1:3
 MAX_OPEN_POSITIONS = 3
 
+PAPER_START_BALANCE = 100.0
+paper_balance = PAPER_START_BALANCE
+
 # Пока пусто — автоматические сделки запрещены.
 # Позже сюда добавим разрешённые символы.
 ALLOWED_SYMBOLS = set()
