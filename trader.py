@@ -291,30 +291,12 @@ def paper_trade(signal):
     # PAPER баланс
     # ---------------------------------------------------------
 
-    balance = signal.get("paper_balance")
+    global paper_balance
 
-    if balance is None:
-        balance = 1000.0
+    balance = paper_balance
 
-    try:
-        balance = float(balance)
-    except (TypeError, ValueError):
-        log("❌ PAPER: некорректный paper_balance")
-        return False
-
-    # ---------------------------------------------------------
-    # Размер позиции
-    # ---------------------------------------------------------
-
-    quantity = calculate_position_size(
-        balance=balance,
-        entry_price=entry,
-        stop_price=stop,
-        risk_percent=RISK_PER_TRADE
-    )
-
-    if quantity <= 0:
-        log("❌ PAPER: некорректный размер позиции")
+    if balance <= 0:
+        log("❌ PAPER: баланс закончился")
         return False
 
     # ---------------------------------------------------------
