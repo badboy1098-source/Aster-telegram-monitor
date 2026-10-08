@@ -39,6 +39,47 @@ completed_trade_ids = set()
 def log(message):
     print(f"[TRADER] {message}", flush=True)
 
+def send_trader_telegram(message):
+    """
+    Отправляет торговые уведомления только владельцу.
+    Подписчики ASTER PRO это сообщение не получают.
+    """
+
+    token = os.getenv("TELEGRAM_TOKEN")
+
+    if not token:
+        log("❌ TRADER: TELEGRAM_TOKEN не найден")
+        return False
+
+    if not TRADER_CHAT_ID:
+        log("❌ TRADER: TRADER_CHAT_ID не найден")
+        return False
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+
+    try:
+        response = requests.post(
+            url,
+            json={
+                "chat_id": TRADER_CHAT_ID,
+                "text": message
+            },
+            timeout=10
+        )
+
+        if response.ok:
+            return True
+
+        log(
+            f"❌ TRADER Telegram ошибка: "
+            f"{response.status_code} {response.text}"
+        )
+
+    except Exception as e:
+        log(f"❌ TRADER Telegram ошибка: {e}")
+
+    return False
+
 
 def get_account_balance():
     """
